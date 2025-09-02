@@ -4,13 +4,12 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import matplotlib.pyplot as plt
-from PIL import Image
+# import matplotlib.pyplot as plt
+# from PIL import Image
 import base64, sqlite3, os
 from datetime import datetime
 from io import BytesIO
 import plotly.graph_objects as go
-import pathlib
 from utils.config import HERO_PATH, BADGE_PATH, SPECIALIST_IDS, VF_IMAGES_DIR, OCT_IMAGES_DIR
 
 timestamp = datetime.now().strftime("%Y-%m-%d, %H:%M:%S")
