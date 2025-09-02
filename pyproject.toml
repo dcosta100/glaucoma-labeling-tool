@@ -1,0 +1,17 @@
+[project]
+name = "glaucoma-interface"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.11"
+dependencies = [
+    "icecream>=2.1.7",
+    "ipykernel>=6.30.1",
+    "matplotlib>=3.10.6",
+    "opencv-python>=4.12.0.88",
+    "openpyxl>=3.1.5",
+    "pandas>=2.3.2",
+    "plotly>=6.3.0",
+    "streamlit>=1.49.1",
+    "tqdm>=4.67.1",
+]
