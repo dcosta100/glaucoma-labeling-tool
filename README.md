@@ -5,5 +5,10 @@ TODO:
 * [ ] Review the diagnosis logic and the flow over the data during the labeling progress
 * [ ] Set the cloud environment [jsons and images from aws s3]
 * [ ] Put the website on cloud with a paid streamlit account
-* [ ] get real data from patients [real list]
-* [ ] Add save button with log output
+* [X] get real data from patients [real list]
+* [X] Add save button with log output
+
+
+
+- Check the load json to check previous labels + create a cache for images and labels
+- get rid of the dummie data

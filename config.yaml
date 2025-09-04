@@ -1,0 +1,24 @@
+cookie:
+  expiry_days: 30
+  key: 1dad944de428c0a615cd6eed2ac4d93a
+  name: cookie_name
+credentials:
+  usernames:
+    ali_azizi:
+      email: axa4487@miami.edu
+      failed_login_attempts: 0
+      first_name: Ali
+      last_name: Azizi
+      logged_in: False
+      password: password
+      roles:
+      - viewer
+    admin:
+      email: rxs2121@miami.edu
+      failed_login_attempts: 0
+      first_name: Admin
+      last_name: User
+      logged_in: False
+      password: password
+      roles:
+      - admin
