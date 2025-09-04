@@ -13,6 +13,9 @@ from utils.config import VF_IMAGES_DIR, OCT_IMAGES_DIR, EXTS
 from utils import dataloader
 import json
 
+if 'database' not in st.session_state:
+    st.session_state['database'] = pd.read_csv("data/fake_patients.csv")
+
 
 def labeling_page():
     st.set_page_config(page_title="Glaucoma Progression Interface - Labeling", layout="wide", initial_sidebar_state="expanded")
@@ -55,14 +58,12 @@ def labeling_page():
         unsafe_allow_html=True,
     )
     st.markdown("---")
-    #! TRASH
     # ------------  Dummy patient list ------------------------------------ #
+    # Load patients from the database CSV
+    df_patients = st.session_state['database']
     patients = {
-        "Patient_001": {"Sex": "Male",   "Age": 65},
-        "Patient_002": {"Sex": "Female", "Age": 72},
-        "Patient_003": {"Sex": "Male",   "Age": 58},
-        "Patient_004": {"Sex": "Female", "Age": 67},
-        "Patient_005": {"Sex": "Male",   "Age": 75},
+        row['Patient']: {"Sex": row['Sex'], "Age": row['Age']}
+        for _, row in df_patients.iterrows()
     }
     selected = st.sidebar.selectbox("Select Patient", list(patients.keys()))
     if selected:
@@ -115,24 +116,17 @@ def labeling_page():
 
     # ------------  MD Records Section ------------------------------------ #
     date_range = pd.date_range(start='2016-01-01', end='2025-04-30', periods=6)
-    #! TRASH
-    base_md = {
-        "Patient_001": {"OD": [-4, -5, -6, -7, -8, -9],
-                        "OS": [-3, -4, -5, -6, -7, -8]},
-        "Patient_002": {"OD": [-15.51, -15.10, -16.01, -16.55, -19.97, -21.00],
-                        "OS": [-13.70, -13.80, -15.01, -16.50, -16.97, -20.00]},
-        "Patient_003": {"OD": [-10, -11, -12, -13, -14, -15],
-                        "OS": [-9, -10, -11, -12, -13, -14]},
-        "Patient_004": {"OD": [-6, -6.5, -7, -8, -9, -9.5],
-                        "OS": [-5, -5.5, -6, -7, -8, -8.5]},
-        "Patient_005": {"OD": [-12, -13, -14, -15, -16, -17],
-                        "OS": [-11, -12, -13, -14, -15, -16]},
-    }
+    # Extract MD values for the selected patient from the session_state database
+    df_patient = df_patients[df_patients["Patient"] == selected]
+    # Assume each row is a timepoint for the patient, sorted by Timepoint
+    df_patient = df_patient.sort_values("Timepoint")
+    od_md = df_patient["OD"].astype(float).tolist()
+    os_md = df_patient["OS"].astype(float).tolist()
 
     md_data = pd.DataFrame({
         "Date": date_range,
-        "OD MD (dB)": base_md[selected]["OD"],
-        "OS MD (dB)": base_md[selected]["OS"]
+        "OD MD (dB)": od_md,
+        "OS MD (dB)": os_md
     })
 
     years = (md_data["Date"] - md_data["Date"].iloc[0]).dt.days / 365.25
