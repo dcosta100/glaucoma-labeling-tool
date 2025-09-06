@@ -4,238 +4,284 @@
 import streamlit as st
 import numpy as np
 import pandas as pd
-import base64
-import os
 from datetime import datetime
-from io import BytesIO
 import plotly.graph_objects as go
-from utils.config import VF_IMAGES_DIR, OCT_IMAGES_DIR, EXTS
-from utils import dataloader
 import json
 
-if 'database' not in st.session_state:
-    st.session_state['database'] = pd.read_csv("data/fake_patients.csv")
+from utils.config import VF_IMAGES_DIR, OCT_IMAGES_DIR
+from utils import dataloader
+from utils.cache_manager import CacheManager
+from utils.image_handler import ImageHandler
+from utils.ui_components import UIComponents
 
 
-def labeling_page():
-    st.set_page_config(page_title="Glaucoma Progression Interface - Labeling", layout="wide", initial_sidebar_state="expanded")
+def initialize_session_state():
+    """Initialize session state variables"""
+    if 'database' not in st.session_state:
+        st.session_state['database'] = pd.read_csv("data/fake_patients.csv")
+    
+    if 'patient_defaults' not in st.session_state:
+        st.session_state['patient_defaults'] = {}
 
-    timestamp = datetime.now().strftime("%Y-%m-%d, %H:%M:%S")
 
-    # --------------------------------------------------------------------------- #
-    # Main interface
-    # --------------------------------------------------------------------------- #
-    if st.session_state.get("show_welcome", False):
-        st.success(f"Welcome, Dr. {st.session_state.specialist_name}!")
-        st.session_state.show_welcome = False
-
-    # Logged in as
-    st.markdown(
-        f"<p style='text-align:right; color:gray;'>Logged in as: "
-        f"<strong>Dr. {st.session_state.specialist_name}</strong></p>",
-        unsafe_allow_html=True,
-    )
-
-    #------------  CSS ---------------------------------------------------- #
-    st.markdown(
-        """
-        <style>
-            .scrollable-box{height:450px; overflow-y:scroll; padding-right:10px;
-                            border:1px solid #ddd;}
-        </style>
-        """,
-        unsafe_allow_html=True,
-    )
-
-    # ------------  Header ------------------------------------------------- #
-    st.markdown(
-        """
-        <h1 style='text-align:center;'>Glaucoma Progression Interface</h1>
-        <p style='text-align:center; font-size:18px; color:gray;'>
-            A Collaborative Platform for Glaucoma Specialists
-        </p>
-        """,
-        unsafe_allow_html=True,
-    )
-    st.markdown("---")
-    # ------------  Dummy patient list ------------------------------------ #
-    # Load patients from the database CSV
+def load_patient_data():
+    """Load and return patient data from database"""
     df_patients = st.session_state['database']
     patients = {
         row['Patient']: {"Sex": row['Sex'], "Age": row['Age']}
         for _, row in df_patients.iterrows()
     }
-    selected = st.sidebar.selectbox("Select Patient", list(patients.keys()))
-    if selected:
-        st.sidebar.markdown("---")
-        st.sidebar.subheader(f"Patient Information: {selected}")
-        for k, v in patients[selected].items():
-            st.sidebar.write(f"{k}: {v}")
+    return df_patients, patients
 
-    def find_folder(base, pid):
-        for fld in os.listdir(base):
-            if pid.lower() in fld.lower():
-                return os.path.join(base, fld)
-        return None
 
-    def eye_imgs(base, mod, pid, eye):
-        fld = find_folder(base, pid)
-        if not fld: return []
-        prefix = f"{mod}_{pid}_{eye}_"
-        return [os.path.join(fld, f) for f in sorted(os.listdir(fld))
-                if f.startswith(prefix) and f.endswith(EXTS)]
-
-    def scroll_imgs(img_list, h=450):
-        html = ""
-        for p in img_list:
-            if os.path.exists(p):
-                b64 = base64.b64encode(open(p, "rb").read()).decode()
-                html += f"<img src='data:image/png;base64,{b64}' style='width:100%; margin-bottom:10px;'/>"
-        st.markdown(f"<div class='scrollable-box'>{html}</div>", unsafe_allow_html=True)
-
-    def eval_section(key):
-        st.markdown("##### Specialist Evaluation")
-        stat = st.radio("Progression status:", ["Progressed", "Not Progressed"], key=f"diag_{key}")
-        if stat == "Progressed":
-            d1, d2 = st.columns(2)
-            with d1:
-                date1 = st.date_input("First date progression seen:", key=f"d1_{key}")
-            with d2:
-                date2 = st.date_input("Second date progression seen:", key=f"d2_{key}")
+def handle_patient_selection(selected, cache_manager, dl):
+    """Handle patient selection and data loading"""
+    patient_changed = st.session_state.get('selected_patient', None) != selected
+    
+    if patient_changed:
+        # Load patient data (from cache if available)
+        image_data, previous_saved = cache_manager.get_cached_patient_data(selected, dl)
+        
+        # Show cache status
+        is_cached = selected in st.session_state['patient_cache']
+        if is_cached:
+            st.info(f"📁 Loaded patient {selected} from cache")
         else:
-            date1 = date2 = "N/A"
-            st.write("First date progression seen: N/A")
-            st.write("Second date progression seen: N/A")
-        return stat, date1, date2
+            st.info(f"🔄 Loading patient {selected} data...")
+        
+        # Initialize defaults for this patient
+        patient_defaults = {
+            'vf_od': None, 'oct_od': None, 'vf_os': None, 'oct_os': None,
+            'd1_vf_od': None, 'd2_vf_od': None, 'd1_vf_os': None, 'd2_vf_os': None,
+            'd1_oct_od': None, 'd2_oct_od': None, 'd1_oct_os': None, 'd2_oct_os': None
+        }
+        
+        # Update defaults based on previous saved data
+        if previous_saved and "labels" in previous_saved:
+            for key in ["vf_od", "oct_od", "vf_os", "oct_os"]:
+                label = previous_saved["labels"].get(key, {})
+                status = label.get("status", None)
+                date1 = label.get("date1", None)
+                date2 = label.get("date2", None)
+                
+                # Set the actual status string (not index)
+                if status in ["Progressed", "Not Progressed"]:
+                    patient_defaults[key] = status
+                else:
+                    patient_defaults[key] = None
+                    
+                # Set dates if they exist and are valid
+                if date1 and date1 != "N/A" and date1 != "":
+                    try:
+                        patient_defaults[f'd1_{key}'] = datetime.strptime(date1, "%Y-%m-%d").date()
+                    except:
+                        patient_defaults[f'd1_{key}'] = None
+                        
+                if date2 and date2 != "N/A" and date2 != "":
+                    try:
+                        patient_defaults[f'd2_{key}'] = datetime.strptime(date2, "%Y-%m-%d").date()
+                    except:
+                        patient_defaults[f'd2_{key}'] = None
+        
+        # Store patient-specific defaults
+        st.session_state['patient_defaults'][selected] = patient_defaults
+        
+        # Clear any existing widget states for the new patient to force refresh
+        keys_to_clear = []
+        for key in st.session_state.keys():
+            if key.startswith(('diag_', 'd1_', 'd2_')):
+                keys_to_clear.append(key)
+        for key in keys_to_clear:
+            del st.session_state[key]
+        
+    st.session_state['selected_patient'] = selected
 
-    # ------------  Load images ------------------------------------------- #
-    vf_od  = eye_imgs(VF_IMAGES_DIR,  "VF",  selected, "OD")
-    vf_os  = eye_imgs(VF_IMAGES_DIR,  "VF",  selected, "OS")
-    oct_od = eye_imgs(OCT_IMAGES_DIR, "OCT", selected, "OD")
-    oct_os = eye_imgs(OCT_IMAGES_DIR, "OCT", selected, "OS")
 
-    # ------------  MD Records Section ------------------------------------ #
+def create_md_chart(df_patient, eye_label):
+    """Create MD trend chart for given eye"""
     date_range = pd.date_range(start='2016-01-01', end='2025-04-30', periods=6)
-    # Extract MD values for the selected patient from the session_state database
-    df_patient = df_patients[df_patients["Patient"] == selected]
-    # Assume each row is a timepoint for the patient, sorted by Timepoint
     df_patient = df_patient.sort_values("Timepoint")
-    od_md = df_patient["OD"].astype(float).tolist()
-    os_md = df_patient["OS"].astype(float).tolist()
+    
+    if eye_label == "OD":
+        md_values = df_patient["OD"].astype(float).tolist()
+    else:
+        md_values = df_patient["OS"].astype(float).tolist()
 
     md_data = pd.DataFrame({
         "Date": date_range,
-        "OD MD (dB)": od_md,
-        "OS MD (dB)": os_md
+        f"{eye_label} MD (dB)": md_values
     })
 
     years = (md_data["Date"] - md_data["Date"].iloc[0]).dt.days / 365.25
-    slope_od, intercept_od = np.polyfit(years, md_data["OD MD (dB)"], 1)
-    slope_os, intercept_os = np.polyfit(years, md_data["OS MD (dB)"], 1)
+    slope, intercept = np.polyfit(years, md_data[f"{eye_label} MD (dB)"], 1)
 
-    # ------------  Right Eye Section ------------------------------------- #
+    fig = go.Figure()
+    fig.add_trace(go.Scatter(
+        x=md_data["Date"], y=md_data[f"{eye_label} MD (dB)"],
+        mode="lines+markers", name=eye_label,
+        hovertemplate=f"Date: %{{x|%Y-%m-%d}}<br>{eye_label} MD: %{{y:.2f}} dB"
+    ))
+    fig.add_trace(go.Scatter(
+        x=md_data["Date"], y=slope * years + intercept,
+        mode="lines", line=dict(dash="dash", color="orange"),
+        name=f"{eye_label} slope: {slope:.2f} dB/yr"
+    ))
+    fig.update_layout(
+        xaxis_title="Date", yaxis_title="MD (dB)",
+        hovermode="x unified", template="plotly_white"
+    )
+    return fig
+
+
+def save_labels_data(selected, timestamp, dl, cache_manager):
+    """Save labels data and update cache"""
+    labels = {
+        "timestamp": timestamp,
+        "specialist": st.session_state.get("specialist_name", ""),
+        "patient": selected,
+        "labels": {
+            "vf_od": {
+                "status": st.session_state.get("diag_vf_od", ""),
+                "date1": str(st.session_state.get("d1_vf_od", "")),
+                "date2": str(st.session_state.get("d2_vf_od", "")),
+            },
+            "oct_od": {
+                "status": st.session_state.get("diag_oct_od", ""),
+                "date1": str(st.session_state.get("d1_oct_od", "")),
+                "date2": str(st.session_state.get("d2_oct_od", "")),
+            },
+            "vf_os": {
+                "status": st.session_state.get("diag_vf_os", ""),
+                "date1": str(st.session_state.get("d1_vf_os", "")),
+                "date2": str(st.session_state.get("d2_vf_os", "")),
+            },
+            "oct_os": {
+                "status": st.session_state.get("diag_oct_os", ""),
+                "date1": str(st.session_state.get("d1_oct_os", "")),
+                "date2": str(st.session_state.get("d2_oct_os", "")),
+            },
+        }
+    }
+    
+    # Save json to labels directory
+    success = dl.save_labels(selected, st.session_state.get("specialist_name", ""), labels)
+    
+    # Update the patient defaults after saving
+    st.session_state['patient_defaults'][selected] = {
+        'vf_od': st.session_state.get("diag_vf_od", ""),
+        'oct_od': st.session_state.get("diag_oct_od", ""),
+        'vf_os': st.session_state.get("diag_vf_os", ""),
+        'oct_os': st.session_state.get("diag_oct_os", ""),
+        'd1_vf_od': st.session_state.get("d1_vf_od", None),
+        'd2_vf_od': st.session_state.get("d2_vf_od", None),
+        'd1_vf_os': st.session_state.get("d1_vf_os", None),
+        'd2_vf_os': st.session_state.get("d2_vf_os", None),
+        'd1_oct_od': st.session_state.get("d1_oct_od", None),
+        'd2_oct_od': st.session_state.get("d2_oct_od", None),
+        'd1_oct_os': st.session_state.get("d1_oct_os", None),
+        'd2_oct_os': st.session_state.get("d2_oct_os", None),
+    }
+    
+    # Update labels cache with new data
+    cache_manager.update_labels_cache(selected, labels)
+    
+    return labels
+
+
+def labeling_page():
+    st.set_page_config(
+        page_title="Glaucoma Progression Interface - Labeling", 
+        layout="wide", 
+        initial_sidebar_state="expanded"
+    )
+
+    # Initialize components
+    initialize_session_state()
+    dl = dataloader.DataLoader(labels_dir="labels")
+    cache_manager = CacheManager()
+    image_handler = ImageHandler()
+    ui_components = UIComponents()
+    
+    timestamp = datetime.now().strftime("%Y-%m-%d, %H:%M:%S")
+
+    # Setup UI
+    ui_components.setup_page_style()
+    ui_components.show_welcome_message()
+    ui_components.show_user_info()
+    ui_components.show_header()
+
+    # Load patient data
+    df_patients, patients = load_patient_data()
+    
+    # Sidebar patient selection
+    selected = ui_components.show_patient_sidebar(patients, cache_manager)
+    
+    # Handle patient selection and data loading
+    handle_patient_selection(selected, cache_manager, dl)
+
+    # Load images from cache or fresh
+    if selected in st.session_state['image_cache']:
+        image_data = st.session_state['image_cache'][selected]
+        vf_od = image_data['vf_od']
+        vf_os = image_data['vf_os']
+        oct_od = image_data['oct_od']
+        oct_os = image_data['oct_os']
+    else:
+        # This shouldn't happen since we cache above, but fallback
+        vf_od = image_handler.get_eye_images(VF_IMAGES_DIR, "VF", selected, "OD")
+        vf_os = image_handler.get_eye_images(VF_IMAGES_DIR, "VF", selected, "OS")
+        oct_od = image_handler.get_eye_images(OCT_IMAGES_DIR, "OCT", selected, "OD")
+        oct_os = image_handler.get_eye_images(OCT_IMAGES_DIR, "OCT", selected, "OS")
+
+    # Get patient data for charts
+    df_patient = df_patients[df_patients["Patient"] == selected]
+
+    # Right Eye Section
     with st.expander("Right Eye (OD)", expanded=False):
         c1, c2 = st.columns(2)
 
         with c1:
             st.subheader("VF Printouts (OD)")
-            scroll_imgs(vf_od)
+            image_handler.display_scrollable_images(vf_od)
 
             # MD Trend for OD
             with st.expander("Mean Deviation Trend (OD)", expanded=False):
-                fig_od = go.Figure()
-                fig_od.add_trace(go.Scatter(
-                    x=md_data["Date"], y=md_data["OD MD (dB)"],
-                    mode="lines+markers", name="OD",
-                    hovertemplate="Date: %{x|%Y-%m-%d}<br>OD MD: %{y:.2f} dB"
-                ))
-                fig_od.add_trace(go.Scatter(
-                    x=md_data["Date"], y=slope_od * years + intercept_od,
-                    mode="lines", line=dict(dash="dash", color="orange"),
-                    name=f"OD slope: {slope_od:.2f} dB/yr"
-                ))
-                fig_od.update_layout(
-                    xaxis_title="Date", yaxis_title="MD (dB)",
-                    hovermode="x unified", template="plotly_white"
-                )
+                fig_od = create_md_chart(df_patient, "OD")
                 st.plotly_chart(fig_od, use_container_width=True)
 
             # Evaluation for OD VF
-            d_vf_od, d1_vf_od, d2_vf_od = eval_section("vf_od")
+            d_vf_od, d1_vf_od, d2_vf_od = ui_components.eval_section("vf_od", selected)
 
         with c2:
             st.subheader("OCT Printouts (OD)")
-            scroll_imgs(oct_od)
-            d_oct_od, d1_oct_od, d2_oct_od = eval_section("oct_od")
+            image_handler.display_scrollable_images(oct_od)
+            d_oct_od, d1_oct_od, d2_oct_od = ui_components.eval_section("oct_od", selected)
 
-    # ------------  Left Eye Section -------------------------------------- #
+    # Left Eye Section
     with st.expander("Left Eye (OS)", expanded=False):
         c1, c2 = st.columns(2)
 
         with c1:
             st.subheader("VF Printouts (OS)")
-            scroll_imgs(vf_os)
+            image_handler.display_scrollable_images(vf_os)
 
             # MD Trend for OS
             with st.expander("Mean Deviation Trend (OS)", expanded=False):
-                fig_os = go.Figure()
-                fig_os.add_trace(go.Scatter(
-                    x=md_data["Date"], y=md_data["OS MD (dB)"],
-                    mode="lines+markers", name="OS",
-                    hovertemplate="Date: %{x|%Y-%m-%d}<br>OS MD: %{y:.2f} dB"
-                ))
-                fig_os.add_trace(go.Scatter(
-                    x=md_data["Date"], y=slope_os * years + intercept_os,
-                    mode="lines", line=dict(dash="dash", color="orange"),
-                    name=f"OS slope: {slope_os:.2f} dB/yr"
-                ))
-                fig_os.update_layout(
-                    xaxis_title="Date", yaxis_title="MD (dB)",
-                    hovermode="x unified", template="plotly_white"
-                )
+                fig_os = create_md_chart(df_patient, "OS")
                 st.plotly_chart(fig_os, use_container_width=True)
 
             # Evaluation for OS VF
-            d_vf_os, d1_vf_os, d2_vf_os = eval_section("vf_os")
+            d_vf_os, d1_vf_os, d2_vf_os = ui_components.eval_section("vf_os", selected)
 
         with c2:
             st.subheader("OCT Printouts (OS)")
-            scroll_imgs(oct_os)
-            d_oct_os, d1_oct_os, d2_oct_os = eval_section("oct_os")
-    # ------------  Save Labels Section [JSON] ---------------------------------- #
+            image_handler.display_scrollable_images(oct_os)
+            d_oct_os, d1_oct_os, d2_oct_os = ui_components.eval_section("oct_os", selected)
+            
+    # Save Labels Section
     if st.button("Save Labels", use_container_width=True):
-        labels = {
-            "timestamp": timestamp,
-            "specialist": st.session_state.get("specialist_name", ""),
-            "patient": selected,
-            "labels": {
-                "vf_od": {
-                    "status": st.session_state.get("diag_vf_od", ""),
-                    "date1": str(st.session_state.get("d1_vf_od", "")),
-                    "date2": str(st.session_state.get("d2_vf_od", "")),
-                },
-                "oct_od": {
-                    "status": st.session_state.get("diag_oct_od", ""),
-                    "date1": str(st.session_state.get("d1_oct_od", "")),
-                    "date2": str(st.session_state.get("d2_oct_od", "")),
-                },
-                "vf_os": {
-                    "status": st.session_state.get("diag_vf_os", ""),
-                    "date1": str(st.session_state.get("d1_vf_os", "")),
-                    "date2": str(st.session_state.get("d2_vf_os", "")),
-                },
-                "oct_os": {
-                    "status": st.session_state.get("diag_oct_os", ""),
-                    "date1": str(st.session_state.get("d1_oct_os", "")),
-                    "date2": str(st.session_state.get("d2_oct_os", "")),
-                },
-            }
-        }
+        labels = save_labels_data(selected, timestamp, dl, cache_manager)
         json_str = json.dumps(labels, indent=4, default=str)
-        
-        # Save json to labels directory
-        dl = dataloader.DataLoader(labels_dir="labels")
-        success = dl.save_labels(selected, st.session_state.get("specialist_name", ""), labels)
         
         st.download_button(
             label="Download Labels as JSON",
@@ -245,5 +291,12 @@ def labeling_page():
         )
         st.success("Labels saved! Download your JSON file.")
 
+    # Cache management
+    ui_components.show_cache_management(cache_manager)
+
     st.markdown("---")
     st.write("Glaucoma and Data Science Laboratory | Bascom Palmer Eye Institute")
+
+
+if __name__ == "__main__":
+    labeling_page()
