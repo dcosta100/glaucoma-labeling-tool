@@ -2,11 +2,11 @@
 import pathlib
 
 
-VF_IMAGES_DIR = "/home/fmedeiros/Downloads/glaucoma_interface/data/sample/vfs/"
-OCT_IMAGES_DIR = "/home/fmedeiros/Downloads/glaucoma_interface/data/sample/octs/"
+VF_IMAGES_DIR = "./data/sample/vfs/"
+OCT_IMAGES_DIR = "./data/sample/octs/"
 
-HERO_PATH = pathlib.Path("/home/fmedeiros/Downloads/glaucoma_interface/source/AdobeStock_743049872-2500x1092.jpeg")
-BADGE_PATH = pathlib.Path("/home/fmedeiros/Downloads/glaucoma_interface/source/BPEI_animated.gif")
+HERO_PATH = pathlib.Path("./source/AdobeStock_743049872-2500x1092.jpeg")
+BADGE_PATH = pathlib.Path("./source/BPEI_animated.gif")
 
 
 # ------------  Helper funcs ------------------------------------------ #
