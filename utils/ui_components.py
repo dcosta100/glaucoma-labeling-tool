@@ -86,7 +86,7 @@ class UIComponents:
         
         if selected:
             st.sidebar.markdown("---")
-            st.sidebar.subheader(f"Patient Information: {selected}")
+            # st.sidebar.subheader(f"Patient Information: {selected}")
             for key, value in patients[selected].items():
                 st.sidebar.write(f"{key}: {value}")
         
@@ -139,27 +139,27 @@ class UIComponents:
     
     def show_cache_management(self, cache_manager):
         """Display cache management controls and statistics"""
-        # Cache management button
-        if st.sidebar.button("🗑️ Clear Cache"):
-            cache_manager.clear_cache()
-            st.success("Cache cleared successfully!")
-            st.rerun()
 
         # Display cache statistics in sidebar
         cache_stats = cache_manager.get_cache_statistics()
         
-        if st.sidebar.expander("Cache Statistics", expanded=False):
-            st.sidebar.write(f"Cached patients: {cache_stats['patients_cached']}/{cache_stats['max_cache_size']}")
-            st.sidebar.write(f"Images cached: {cache_stats['images_cached']}")
-            st.sidebar.write(f"Labels cached: {cache_stats['labels_cached']}")
+        with st.sidebar.expander("Cache Statistics", expanded=False):
+            st.write(f"Cached patients: {cache_stats['patients_cached']}/{cache_stats['max_cache_size']}")
+            st.write(f"Images cached: {cache_stats['images_cached']}")
+            st.write(f"Labels cached: {cache_stats['labels_cached']}")
+             # Cache management button
+            if st.button("🗑️ Clear Cache"):
+                cache_manager.clear_cache()
+                st.success("Cache cleared successfully!")
+                st.rerun()
             
             if cache_stats['cache_order']:
-                st.sidebar.write("**Cache order (oldest → newest):**")
+                st.write("**Cache order (oldest → newest):**")
                 current_patient = st.session_state.get('selected_patient', None)
                 
                 for i, patient in enumerate(cache_stats['cache_order'], 1):
                     status = "🟢" if patient == current_patient else "⚪"
-                    st.sidebar.write(f"{i}. {status} {patient}")
+                    st.write(f"{i}. {status} {patient}")
     
     def show_patient_info_card(self, patient_id, patient_data):
         """Display patient information in a card format"""
