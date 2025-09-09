@@ -221,3 +221,4 @@ __marimo__/
 *.sqlite
 logs/
 labels/
+trash/

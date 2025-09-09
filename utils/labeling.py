@@ -8,17 +8,19 @@ from datetime import datetime
 import plotly.graph_objects as go
 import json
 
-from utils.config import VF_IMAGES_DIR, OCT_IMAGES_DIR
+from utils.config import VF_IMAGES_DIR, OCT_IMAGES_DIR, DATABASE_PATH
 from utils import dataloader
 from utils.cache_manager import CacheManager
 from utils.image_handler import ImageHandler
 from utils.ui_components import UIComponents
 
+from icecream import ic
+
 
 def initialize_session_state():
     """Initialize session state variables"""
     if 'database' not in st.session_state:
-        st.session_state['database'] = pd.read_csv("data/fake_patients.csv")
+        st.session_state['database'] = pd.read_csv(DATABASE_PATH)
     
     if 'patient_defaults' not in st.session_state:
         st.session_state['patient_defaults'] = {}
@@ -27,10 +29,17 @@ def initialize_session_state():
 def load_patient_data():
     """Load and return patient data from database"""
     df_patients = st.session_state['database']
-    patients = {
-        row['Patient']: {"Sex": row['Sex'], "Age": row['Age']}
-        for _, row in df_patients.iterrows()
-    }
+    
+    # Get unique patients with their info
+    patients = {}
+    for _, row in df_patients.iterrows():
+        patient_id = row['Patient']
+        if patient_id not in patients:
+            patients[patient_id] = {
+                "Sex": row['Sex'], 
+                "Age": row['Age']
+            }
+    
     return df_patients, patients
 
 
@@ -43,7 +52,7 @@ def handle_patient_selection(selected, cache_manager, dl):
         image_data, previous_saved = cache_manager.get_cached_patient_data(selected, dl)
         
         # Show cache status
-        is_cached = selected in st.session_state['patient_cache']
+        is_cached = str(selected) in st.session_state['patient_cache']
         if is_cached:
             st.info(f"📁 Loaded patient {selected} from cache")
         else:
@@ -99,37 +108,92 @@ def handle_patient_selection(selected, cache_manager, dl):
 
 def create_md_chart(df_patient, eye_label):
     """Create MD trend chart for given eye"""
-    date_range = pd.date_range(start='2016-01-01', end='2025-04-30', periods=6)
-    df_patient = df_patient.sort_values("Timepoint")
+    # Sort by timepoint and ensure we have valid data
+    df_patient = df_patient.sort_values("Timepoint").copy()
     
+    # Get the correct column name for the eye
     if eye_label == "OD":
-        md_values = df_patient["OD"].astype(float).tolist()
+        md_column = "OD_vf"
     else:
-        md_values = df_patient["OS"].astype(float).tolist()
+        md_column = "OS_vf"
+    
+    # Filter out any rows with missing MD values
+    df_patient = df_patient.dropna(subset=[md_column])
+    
+    if len(df_patient) == 0:
+        # Return empty chart if no data
+        fig = go.Figure()
+        fig.add_annotation(
+            text=f"No {eye_label} visual field data available",
+            xref="paper", yref="paper",
+            x=0.5, y=0.5, xanchor='center', yanchor='middle'
+        )
+        fig.update_layout(
+            xaxis_title="Date", yaxis_title="MD (dB)",
+            template="plotly_white"
+        )
+        return fig
+    
+    # Use actual timepoints if they're datetime, otherwise create a range
+    if pd.api.types.is_datetime64_any_dtype(df_patient['Timepoint']):
+        dates = df_patient['Timepoint'].tolist()
+    else:
+        # Create date range based on number of timepoints
+        dates = pd.date_range(
+            start='2016-01-01', 
+            end='2025-04-30', 
+            periods=len(df_patient)
+        ).tolist()
+    
+    # Get MD values
+    md_values = df_patient[md_column].astype(float).tolist()
 
+    # Create dataframe for plotting
     md_data = pd.DataFrame({
-        "Date": date_range,
+        "Date": dates,
         f"{eye_label} MD (dB)": md_values
     })
 
-    years = (md_data["Date"] - md_data["Date"].iloc[0]).dt.days / 365.25
-    slope, intercept = np.polyfit(years, md_data[f"{eye_label} MD (dB)"], 1)
+    # Calculate trend line
+    if len(md_data) > 1:
+        years = (md_data["Date"] - md_data["Date"].iloc[0]).dt.days / 365.25
+        slope, intercept = np.polyfit(years, md_data[f"{eye_label} MD (dB)"], 1)
+        trend_y = slope * years + intercept
+    else:
+        slope = 0
+        trend_y = md_values
 
+    # Create plot
     fig = go.Figure()
+    
+    # Add data points
     fig.add_trace(go.Scatter(
-        x=md_data["Date"], y=md_data[f"{eye_label} MD (dB)"],
-        mode="lines+markers", name=eye_label,
-        hovertemplate=f"Date: %{{x|%Y-%m-%d}}<br>{eye_label} MD: %{{y:.2f}} dB"
+        x=md_data["Date"], 
+        y=md_data[f"{eye_label} MD (dB)"],
+        mode="lines+markers", 
+        name=f"{eye_label} MD",
+        hovertemplate=f"Date: %{{x|%Y-%m-%d}}<br>{eye_label} MD: %{{y:.2f}} dB<extra></extra>"
     ))
-    fig.add_trace(go.Scatter(
-        x=md_data["Date"], y=slope * years + intercept,
-        mode="lines", line=dict(dash="dash", color="orange"),
-        name=f"{eye_label} slope: {slope:.2f} dB/yr"
-    ))
+    
+    # Add trend line if we have multiple points
+    if len(md_data) > 1:
+        fig.add_trace(go.Scatter(
+            x=md_data["Date"], 
+            y=trend_y,
+            mode="lines", 
+            line=dict(dash="dash", color="orange"),
+            name=f"{eye_label} slope: {slope:.2f} dB/yr",
+            hovertemplate=f"Trend: %{{y:.2f}} dB<extra></extra>"
+        ))
+    
     fig.update_layout(
-        xaxis_title="Date", yaxis_title="MD (dB)",
-        hovermode="x unified", template="plotly_white"
+        xaxis_title="Date", 
+        yaxis_title="MD (dB)",
+        hovermode="x unified", 
+        template="plotly_white",
+        showlegend=True
     )
+    
     return fig
 
 
@@ -198,10 +262,13 @@ def labeling_page():
     # Initialize components
     initialize_session_state()
     dl = dataloader.DataLoader(labels_dir="labels")
-    cache_manager = CacheManager()
-    image_handler = ImageHandler()
-    ui_components = UIComponents()
     
+    # Initialize ImageHandler with DataFrame and set it in CacheManager
+    image_handler = ImageHandler(df=st.session_state['database'], data_dir=VF_IMAGES_DIR)
+    cache_manager = CacheManager()
+    cache_manager.set_image_handler(image_handler)
+    
+    ui_components = UIComponents()
     timestamp = datetime.now().strftime("%Y-%m-%d, %H:%M:%S")
 
     # Setup UI
@@ -220,12 +287,14 @@ def labeling_page():
     handle_patient_selection(selected, cache_manager, dl)
 
     # Load images from cache or fresh
-    if selected in st.session_state['image_cache']:
-        image_data = st.session_state['image_cache'][selected]
+    cache_key = str(selected)
+    if cache_key in st.session_state['image_cache']:
+        image_data = st.session_state['image_cache'][cache_key]
         vf_od = image_data['vf_od']
         vf_os = image_data['vf_os']
         oct_od = image_data['oct_od']
         oct_os = image_data['oct_os']
+        
     else:
         # This shouldn't happen since we cache above, but fallback
         vf_od = image_handler.get_eye_images(VF_IMAGES_DIR, "VF", selected, "OD")

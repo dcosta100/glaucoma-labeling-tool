@@ -2,8 +2,8 @@
 import pathlib
 
 
-VF_IMAGES_DIR = "./data/sample/vfs/"
-OCT_IMAGES_DIR = "./data/sample/octs/"
+VF_IMAGES_DIR = "./data/"
+OCT_IMAGES_DIR = "./data/"
 
 HERO_PATH = pathlib.Path("./source/AdobeStock_743049872-2500x1092.jpeg")
 BADGE_PATH = pathlib.Path("./source/BPEI_animated.gif")
@@ -35,7 +35,7 @@ CACHE_EXPIRY_HOURS = 24
 
 # File paths
 LABELS_DIR = "labels"
-DATABASE_PATH = "data/fake_patients.csv"
+DATABASE_PATH = "data/fake_patients_interface.csv"
 
 # UI Settings
 PAGE_TITLE = "Glaucoma Progression Interface - Labeling"

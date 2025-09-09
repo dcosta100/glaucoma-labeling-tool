@@ -4,7 +4,7 @@ TODO:
 * [X] Check if sqlite is the better structure for this cloud solution [change to json]: every new patient will download his images and metadata [save as cache], and after saving push a json into aws s3, the same when loading [check if there is a json]
 * [X] Review the diagnosis logic and the flow over the data during the labeling progress
 * [ ] Set the cloud environment [jsons and images from aws s3]
-* [ ] Put the website on cloud with a streamlit account
+* [X] Put the website on cloud with a streamlit account
 * [X] get real data from patients [real list]
 * [X] Add save button with log output
 
@@ -14,5 +14,7 @@ TODO:
 
 
 
+LATER:
 
 - [ ] Load always 2 patients in advance async
+- [ ] Pointer para salvar o ultimo ponto de label
