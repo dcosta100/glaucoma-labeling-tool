@@ -22,118 +22,151 @@ class UIComponents:
         pdf_display = f'<iframe src="data:application/pdf;base64,{base64_pdf}" width="100%" height="{height}px" type="application/pdf"></iframe>'
         st.markdown(pdf_display, unsafe_allow_html=True)
 
-    def render_labels_for_field(self, vf_key: str, defaults: Dict = None) -> Dict:
+    def render_labels_for_field(self, vf_key: str, defaults: dict | None = None) -> dict:
         """
-        Display label selectors for a single visual field, using 2 rows, 4 columns for 1st row and 1 column for 2nd row.
+        Coluna 1 (normality/reliability): sempre visível (sem "Null").
+        Colunas 2–4 (glaucoma, não-glaucoma, artefato): iniciam em "Null" e revelam progressivamente.
+        Todo seletor recém-revelado abre já em "Null".
+        """
+        import streamlit as st
+        from utils import config  # ajuste o import se seu config estiver em outro caminho
 
-        Args:
-            vf_key: Unique key for the field (e.g., '1_R_2')
-            defaults: Preloaded labels (if any)
-        
-        Returns:
-            Dictionary of selected labels
-        """
         st.markdown("##### Labels")
 
-        selected = {}
+        selected: dict = {}
         defaults = defaults or {}
+
+        # ---- helpers de chave e opções ----
+        def sk(label_key: str) -> str:
+            return f"{vf_key}_{label_key}"
 
         def with_null(options: list) -> list:
             return ["Null"] + [opt for opt in options if opt != "Null"]
 
-        def clear_keys(keys):
+        def clear_keys(keys: list[str]):
             for k in keys:
-                skey = f"{vf_key}_{k}"
-                if skey in st.session_state:
-                    del st.session_state[skey]
+                st.session_state.pop(sk(k), None)
 
-        def pick(label_key: str, options: list, col, title=None, default_override: str | None = None, include_null=True):
+        # ---- inicialização por vf_key: força colunas 2–4 a começar em "Null" na primeira carga ----
+        init_flag = f"{vf_key}__init_done"
+        if not st.session_state.get(init_flag, False):
+            dep_keys = [
+                # glaucoma
+                "gdefect1", "gposition1", "gdefect2", "gposition2", "gdefect3", "gposition3",
+                # não-glaucoma
+                "ngdefect1", "ngposition1", "ngdefect2", "ngposition2", "ngdefect3", "ngposition3",
+                # artefatos
+                "artifact1", "artifact2",
+            ]
+            for k in dep_keys:
+                st.session_state[sk(k)] = "Null"
+            st.session_state[init_flag] = True
+
+        # ---- selectbox com controle de default/Null ----
+        def pick(label_key: str, options: list, col, title: str | None = None,
+                include_null: bool = True, prefer_null_default: bool = False):
+            """
+            prefer_null_default=True: se não houver valor no session_state, inicia em 'Null' (ignorando defaults).
+            Ordem: session_state -> (prefer Null?) -> defaults -> "Null" (se existir) -> primeiro item.
+            """
             opts = with_null(options) if include_null else list(options)
             label_txt = (title or label_key).replace("_", " ").capitalize()
-            skey = f"{vf_key}_{label_key}"
+            s_key = sk(label_key)
 
-            # ordem de preferência: session_state -> defaults -> default_override -> idx 0
-            if skey in st.session_state and st.session_state[skey] in opts:
-                idx = opts.index(st.session_state[skey])
+            if s_key in st.session_state and st.session_state[s_key] in opts:
+                idx = opts.index(st.session_state[s_key])
             else:
-                dv = defaults.get(label_key)
-                if dv in opts:
-                    idx = opts.index(dv)
-                elif default_override in opts:
-                    idx = opts.index(default_override)
+                if prefer_null_default and "Null" in opts:
+                    idx = opts.index("Null")
                 else:
-                    idx = 0
+                    dv = defaults.get(label_key)
+                    if dv in opts:
+                        idx = opts.index(dv)
+                    else:
+                        idx = opts.index("Null") if "Null" in opts else 0
 
-            val = col.selectbox(label_txt, opts, index=idx, key=skey)
+            val = col.selectbox(label_txt, opts, index=idx, key=s_key)
             selected[label_key] = val
             return val
-        
-        # --- Primeira linha (4 colunas) ---
+
+        # ---- layout ----
         col1, col2, col3, col4 = st.columns(4)
 
+        # Coluna 1: fixa (sem Null)
         with col1:
-            pick("normality", config.VISUAL_FIELD_LABELS["normality"], col1, "Normality",
-                default_override="Normal", include_null=False)  # sem "Null" aqui
-            pick("reliability", config.VISUAL_FIELD_LABELS["reliability"], col1, "Reliability",
-                default_override="Reliable", include_null=False)  # sem "Null" aqui
-        
+            pick("normality", config.VISUAL_FIELD_LABELS["normality"], col1, "Normality", include_null=False)
+            pick("reliability", config.VISUAL_FIELD_LABELS["reliability"], col1, "Reliability", include_null=False)
+
+        # Cadeia defeito/posição com abertura progressiva e forçando "Null" ao revelar
+        def chain(prefix_def: str, prefix_pos: str, count: int, col, title_def: str, title_pos: str):
+            for i in range(1, count + 1):
+                dkey = f"{prefix_def}{i}"
+                pkey = f"{prefix_pos}{i}"
+
+                # Primeiro defeito da coluna deve preferir "Null" como default
+                dval = pick(
+                    dkey,
+                    config.VISUAL_FIELD_LABELS[dkey],
+                    col,
+                    f"{title_def} {i}",
+                    include_null=True,
+                    prefer_null_default=(i == 1)
+                )
+
+                if dval == "Null":
+                    # limpa position atual e tudo adiante (defects/positions subsequentes)
+                    to_clear = [pkey] + \
+                            [f"{prefix_def}{j}" for j in range(i + 1, count + 1)] + \
+                            [f"{prefix_pos}{j}" for j in range(i + 1, count + 1)]
+                    clear_keys(to_clear)
+                    break
+                else:
+                    # ao revelar o position i, garanta que abra como "Null" se ainda não existir
+                    if sk(pkey) not in st.session_state:
+                        st.session_state[sk(pkey)] = "Null"
+                    pick(
+                        pkey,
+                        config.VISUAL_FIELD_LABELS[pkey],
+                        col,
+                        f"{title_pos} {i}",
+                        include_null=True,
+                        prefer_null_default=True
+                    )
+
+                    # prepara o próximo defect para abrir como "Null" quando for revelado
+                    if i < count:
+                        ndkey = f"{prefix_def}{i + 1}"
+                        if sk(ndkey) not in st.session_state:
+                            st.session_state[sk(ndkey)] = "Null"
+
+        # Coluna 2: Glaucomatoso
         with col2:
-            g1 = pick("gdefect1", config.VISUAL_FIELD_LABELS["gdefect1"], col2, "Glaucoma Defect 1",
-                    default_override="Null", include_null=True)
-            if g1 != "Null":
-                pick("gposition1", config.VISUAL_FIELD_LABELS["gposition1"], col2, "Glaucoma Position 1",
-                    default_override="Null", include_null=True)
-                g2 = pick("gdefect2", config.VISUAL_FIELD_LABELS["gdefect2"], col2, "Glaucoma Defect 2",
-                        default_override="Null", include_null=True)
-                if g2 != "Null":
-                    pick("gposition2", config.VISUAL_FIELD_LABELS["gposition2"], col2, "Glaucoma Position 2",
-                        default_override="Null", include_null=True)
-                    g3 = pick("gdefect3", config.VISUAL_FIELD_LABELS["gdefect3"], col2, "Glaucoma Defect 3",
-                            default_override="Null", include_null=True)
-                    if g3 != "Null":
-                        pick("gposition3", config.VISUAL_FIELD_LABELS["gposition3"], col2, "Glaucoma Position 3",
-                            default_override="Null", include_null=True)
-                else:
-                    clear_keys(["gposition2", "gdefect3", "gposition3"])
-            else:
-                clear_keys(["gposition1", "gdefect2", "gposition2", "gdefect3", "gposition3"])
+            chain("gdefect", "gposition", 3, col2, "Glaucoma Defect", "Glaucoma Position")
 
+        # Coluna 3: Não-glaucomatoso
         with col3:
-            ng1 = pick("ngdefect1", config.VISUAL_FIELD_LABELS["ngdefect1"], col3, "Non-Glaucomatous Defect 1",
-                    default_override="Null", include_null=True)
-            if ng1 != "Null":
-                pick("ngposition1", config.VISUAL_FIELD_LABELS["ngposition1"], col3, "Non-Glaucomatous Position 1",
-                    default_override="Null", include_null=True)
-                ng2 = pick("ngdefect2", config.VISUAL_FIELD_LABELS["ngdefect2"], col3, "Non-Glaucomatous Defect 2",
-                        default_override="Null", include_null=True)
-                if ng2 != "Null":
-                    pick("ngposition2", config.VISUAL_FIELD_LABELS["ngposition2"], col3, "Non-Glaucomatous Position 2",
-                        default_override="Null", include_null=True)
-                    ng3 = pick("ngdefect3", config.VISUAL_FIELD_LABELS["ngdefect3"], col3, "Non-Glaucomatous Defect 3",
-                            default_override="Null", include_null=True)
-                    if ng3 != "Null":
-                        pick("ngposition3", config.VISUAL_FIELD_LABELS["ngposition3"], col3, "Non-Glaucomatous Position 3",
-                            default_override="Null", include_null=True)
-                else:
-                    clear_keys(["ngposition2", "ngdefect3", "ngposition3"])
-            else:
-                clear_keys(["ngposition1", "ngdefect2", "ngposition2", "ngdefect3", "ngposition3"])
+            chain("ngdefect", "ngposition", 3, col3, "Non-Glaucomatous Defect", "Non-Glaucomatous Position")
 
-
+        # Coluna 4: Artefato (1 -> 2)
         with col4:
             a1 = pick("artifact1", config.VISUAL_FIELD_LABELS["artifact1"], col4, "Artifact 1",
-                    default_override="Null", include_null=True)
-            if a1 != "Null":
-                pick("artifact2", config.VISUAL_FIELD_LABELS["artifact2"], col4, "Artifact 2",
-                    default_override="Null", include_null=True)
-            else:
+                    include_null=True, prefer_null_default=True)
+            if a1 == "Null":
                 clear_keys(["artifact2"])
-            
-        # --- Segunda linha (1 coluna) ---
+            else:
+                # ao revelar artifact2, força abrir como "Null"
+                if sk("artifact2") not in st.session_state:
+                    st.session_state[sk("artifact2")] = "Null"
+                pick("artifact2", config.VISUAL_FIELD_LABELS["artifact2"], col4, "Artifact 2",
+                    include_null=True, prefer_null_default=True)
+
+        # Comentário
         st.markdown("##### Comment")
-        selected["comment"] = st.text_area("Comment", value=defaults.get("comment", ""), key=f"{vf_key}_comment")
+        selected["comment"] = st.text_area("Comment", value=defaults.get("comment", ""), key=sk("comment"))
 
         return selected
+
+
 
     def show_top_header(self, maskedid: str, age: str):
         """Display the header with patient ID and age"""
