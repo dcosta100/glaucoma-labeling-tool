@@ -54,7 +54,10 @@ def labeling_page():
             if eye_df.empty:
                 ui.no_fields_warning(eye)
             else:
-                for _, row in eye_df.iterrows():
+                # Get all visual field numbers for this eye
+                vf_numbers = sorted(eye_df["visual_field_number"].astype(int).tolist())
+                
+                for idx, (_, row) in enumerate(eye_df.iterrows()):
                     vf_number = int(row["visual_field_number"])
                     vf_key = f"{maskedid}_{eye}_{vf_number}"
                     pdf_path = PDF_DIR / row["pdf_filename"]
@@ -84,6 +87,12 @@ def labeling_page():
                     })
 
                     st.session_state[f"labels_{vf_key}"] = labels
+
+                    # Show copy button only for the first field (index 0) if there are more fields
+                    if idx == 0 and len(vf_numbers) > 1:
+                        # Get target fields (all except the current one)
+                        target_vfs = [vf for vf in vf_numbers if vf != vf_number]
+                        ui.show_copy_labels_button(maskedid, eye, vf_number, target_vfs, df_patient)
 
     # --- SAVE BUTTONS ---
     save, flag, next_btn = ui.show_save_buttons()

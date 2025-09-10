@@ -166,7 +166,49 @@ class UIComponents:
 
         return selected
 
+    def show_copy_labels_button(self, maskedid: str, eye: str, source_vf: int, target_vfs: list, df_patient):
+        """
+        Show copy labels button for the first visual field of each eye
+        Only shows if there are multiple visual fields for the eye
+        """
+        if len(target_vfs) > 0:  # Only show if there are target fields to copy to
+            st.markdown("---")
+            copy_key = f"copy_{maskedid}_{eye}_{source_vf}"
+            
+            if st.button(f"📋 Copy labels from {eye}_{source_vf} to other fields", key=copy_key):
+                self.copy_labels_to_fields(maskedid, eye, source_vf, target_vfs)
+                st.success(f"✅ Labels copied from {eye}_{source_vf} to {len(target_vfs)} other field(s)!")
+                st.rerun()
 
+    def copy_labels_to_fields(self, maskedid: str, source_eye: str, source_vf: int, target_vfs: list):
+        """
+        Copy all labels from source field to target fields
+        """
+        source_key = f"{maskedid}_{source_eye}_{source_vf}"
+        
+        # Get all label keys that we want to copy
+        label_keys = [
+            "normality", "reliability",
+            "gdefect1", "gposition1", "gdefect2", "gposition2", "gdefect3", "gposition3",
+            "ngdefect1", "ngposition1", "ngdefect2", "ngposition2", "ngdefect3", "ngposition3",
+            "artifact1", "artifact2",
+            "comment"
+        ]
+        
+        # Copy each label from source to all targets
+        for target_vf in target_vfs:
+            target_key = f"{maskedid}_{source_eye}_{target_vf}"
+            
+            for label_key in label_keys:
+                source_session_key = f"{source_key}_{label_key}"
+                target_session_key = f"{target_key}_{label_key}"
+                
+                # Copy the value if it exists in session state
+                if source_session_key in st.session_state:
+                    st.session_state[target_session_key] = st.session_state[source_session_key]
+            
+            # Mark target field as initialized to prevent reset
+            st.session_state[f"{target_key}__init_done"] = True
 
     def show_top_header(self, maskedid: str, age: str):
         """Display the header with patient ID and age"""
