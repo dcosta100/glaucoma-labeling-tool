@@ -6,6 +6,7 @@ import streamlit_authenticator as stauth
 import yaml
 from yaml.loader import SafeLoader
 from utils import labeling
+from utils.admin_stats import show_admin_stats, add_admin_menu
 
 st.set_page_config(page_title="Glaucoma Progression Interface", layout="wide")
 
@@ -34,8 +35,20 @@ if st.session_state['authentication_status']:
         st.write(f"Welcome **{st.session_state['name']}**")
         authenticator.logout('Logout', 'sidebar')
     
-    # Load labeling page
-    labeling.labeling_page()
+    # Add admin menu if user is admin
+    add_admin_menu()
+    
+    # Check if should show admin stats
+    if st.session_state.get('show_admin_stats', False):
+        show_admin_stats()
+        
+        # Button to return to labeling
+        if st.button("← Back to Labeling"):
+            st.session_state['show_admin_stats'] = False
+            st.rerun()
+    else:
+        # Load labeling page
+        labeling.labeling_page()
 
 elif st.session_state['authentication_status'] == False:
     # Wrong credentials

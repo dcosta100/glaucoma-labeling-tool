@@ -7,7 +7,7 @@ import os
 import pandas as pd
 from pathlib import Path
 from typing import Set, List, Dict, Optional
-from utils.config import LABELS_DIR
+from .config import LABELS_DIR
 
 class PatientTracker:
     def __init__(self, labels_dir: str = None):
@@ -105,14 +105,14 @@ class PatientTracker:
             eye = row['eye']
             vf_number = int(row['visual_field_number'])
             
-            # Verifica se existe arquivo de label para este campo
-            label_file = self.labels_dir / f"{maskedid}_{eye}_{vf_number}.json"
+            # Verifica se existe arquivo de label para este campo COM O USERNAME
+            label_file = self.labels_dir / f"{username}_{maskedid}_{eye}_{vf_number}.json"
             
             if not label_file.exists():
                 all_labeled = False
                 break
             
-            # Verifica se o label foi feito pelo usuário atual
+            # Verifica se o label foi feito pelo usuário atual (validação adicional)
             try:
                 with open(label_file, 'r') as f:
                     label_data = json.load(f)
