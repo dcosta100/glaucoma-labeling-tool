@@ -2,6 +2,10 @@
 # Definir que os comandos devem rodar no shell do PowerShell
 set shell := ["powershell.exe", "-NoLogo", "-Command"]
 
+# Start venv environment:
+startvenv:
+    .venv\Scripts\activate
+
 # Cria ambiente virtual
 venv:
     uv venv
@@ -16,12 +20,13 @@ sync: venv
 
 # Ativa o ambiente (no Windows)
 activate:
-    .venv\Scripts\activate
+    .venv\Scripts\activate.ps1
 
-add: venv
+# Adiciona um pacote (uso: just add package=nome_do_pacote)
+add package: venv
     uv pip install {{package}}
-    uv just sync # Include into requirements.txt and freeze
-    uv just pip freeze > requirements.txt
+    uv sync
+    uv pip freeze > requirements.txt
 
 # Pipeline completo (do zero até sync)
 setup: venv install sync

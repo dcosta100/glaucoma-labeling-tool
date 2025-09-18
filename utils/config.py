@@ -101,8 +101,6 @@ FILENAME_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
 MAX_IMAGE_SIZE_MB = 50
 SUPPORTED_MODALITIES = ['VF', 'OCT']
 SUPPORTED_EYES = ['OD', 'OS']
-PROGRESSION_STATUS_OPTIONS = ["Progressed", "Not Progressed"]
-EVALUATION_KEYS = ["vf_od", "oct_od", "vf_os", "oct_os"]
 
 # Organização
 ORGANIZATION_NAME = "Glaucoma and Data Science Laboratory"
