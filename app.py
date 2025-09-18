@@ -8,7 +8,7 @@ from yaml.loader import SafeLoader
 from utils import labeling
 from utils.admin_stats import show_admin_stats, add_admin_menu
 
-st.set_page_config(page_title="Glaucoma Progression Interface", layout="wide")
+st.set_page_config(page_title="Visual Field Labeling Tool", layout="wide")
 
 # Load configuration
 with open('config.yaml') as file:
@@ -58,7 +58,7 @@ else:
     # Not logged in - show login page
     st.markdown("""
         <h1 style='text-align:center; color:#1f77b4; margin-bottom:30px;'>
-            🏥 Glaucoma Progression Interface
+            👀 Visual Field Labeling Tool
         </h1>
         <div style='text-align:center; margin-bottom:30px;'>
             <p>Please login to access the visual field labeling system</p>
@@ -70,7 +70,7 @@ else:
         <div style='position: fixed; bottom: 0; width: 100%; text-align: center; 
                     background: linear-gradient(90deg, #1f77b4, #1565c0); padding: 15px 0; z-index: 9999;'>
             <p style='color: white; margin: 0; font-weight: 500;'>
-                🏥 Glaucoma and Data Science Laboratory | Bascom Palmer Eye Institute
+            Glaucoma and Data Science Laboratory | Bascom Palmer Eye Institute
             </p>
         </div>
     """, unsafe_allow_html=True)
