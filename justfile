@@ -23,10 +23,7 @@ activate:
     .venv\Scripts\activate.ps1
 
 # Adiciona um pacote (uso: just add package=nome_do_pacote)
-add package: venv
+add package:
     uv pip install {{package}}
     uv sync
     uv pip freeze > requirements.txt
-
-# Pipeline completo (do zero até sync)
-setup: venv install sync
