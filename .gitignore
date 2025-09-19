@@ -222,3 +222,6 @@ data/
 logs/
 labels/
 trash/
+credentials.json
+*.json
+.streamlit/secrets.toml

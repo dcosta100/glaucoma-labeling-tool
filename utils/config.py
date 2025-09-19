@@ -22,6 +22,25 @@ BADGE_PATH = ROOT_DIR / "source" / "BPEI_animated.gif"
 CSV_PATH = DATA_DIR / "opv_24-2_prepared.csv"
 PDF_DIR = "C:\\Users\\dxr1276\\Box\\PROJECTS\\VF_GRADINGS\\hfa_printouts"
 
+CSV_PATH_LOCAL = DATA_DIR / "opv_24-2_prepared.csv"
+
+
+USE_GOOGLE_DRIVE = True  # Mude para False se quiser forçar local
+
+LABELS_DIR.mkdir(parents=True, exist_ok=True)
+
+# Função para determinar fonte de dados
+def get_data_source():
+    """Retorna se deve usar Google Drive ou arquivos locais"""
+    # Se tiver arquivo credentials.json, usa Google Drive
+    if os.path.exists("credentials.json") and USE_GOOGLE_DRIVE:
+        return "drive"
+    # Senão usa local
+    elif os.path.exists(CSV_PATH_LOCAL):
+        return "local"
+    else:
+        return "drive"  # Força Drive se não tem dados locais
+
 # -----------------------------
 # Overrides por variável de ambiente (opcional)
 # -----------------------------
