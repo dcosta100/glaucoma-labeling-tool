@@ -229,6 +229,8 @@ def labeling_page():
                         "eye": eye,
                         "vf_number": vf_number,
                         "pdf_filename": pdf_filename,
+                        "opv_filename": row.get("opv_filename", ""),        
+                        "aeexamdate_shift": row.get("aeexamdate_shift", ""), 
                         "specialist_name": username,
                         "last_updated": datetime.now().isoformat(),
                         "data_source": data_source
