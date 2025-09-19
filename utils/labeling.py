@@ -12,6 +12,8 @@ from utils.dataloader import DataLoader
 from utils.ui_components import UIComponents
 from utils.image_handler import pdf_to_image_fitz
 from utils.patient_tracker import PatientTracker
+from utils.dataloader import GOOGLE_AVAILABLE
+
 
 
 def labeling_page():
@@ -23,19 +25,29 @@ def labeling_page():
     # Get current authenticated username
     username = st.session_state.get('specialist_name', 'unknown')
 
-    st.write(f"GOOGLE_AVAILABLE: {dl.GOOGLE_AVAILABLE if hasattr(dl, 'GOOGLE_AVAILABLE') else 'Not found'}")
+    st.write("=== DEBUG INFO ===")
+    st.write(f"GOOGLE_AVAILABLE: {GOOGLE_AVAILABLE}")
     st.write(f"Has secrets: {hasattr(st, 'secrets')}")
     if hasattr(st, 'secrets'):
         st.write(f"Secrets keys: {list(st.secrets.keys())}")
         if 'google_drive' in st.secrets:
             st.write("google_drive section found")
+            # Mostra algumas chaves dos secrets (sem mostrar valores sensíveis)
+            gd_keys = list(st.secrets['google_drive'].keys())
+            st.write(f"google_drive keys: {gd_keys}")
         else:
             st.write("google_drive section NOT found")
+    else:
+        st.write("No secrets found")
 
-    service = dl._get_drive_service()
-    st.write(f"Drive service created: {service is not None}")
+    # Teste direto do service
+    try:
+        service = dl._get_drive_service()
+        st.write(f"Drive service created: {service is not None}")
+    except Exception as e:
+            st.write(f"Error creating drive service: {e}")
     st.write("==================")
-    
+        
     # Initialize data loader for cloud/local operations
     dl = DataLoader()
     
