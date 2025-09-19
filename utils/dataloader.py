@@ -1,5 +1,5 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Data loader for Glaucoma Progression Interface : Last update September 3, 2025
+# Data loader for Glaucoma Progression Interface : Last update December 20, 2024
 # ─────────────────────────────────────────────────────────────────────────────
 import json
 import os
@@ -12,7 +12,7 @@ import tempfile
 import requests
 from io import BytesIO
 
-# Adicione estas importações para Google Drive
+# Google Drive imports
 try:
     from google.oauth2 import service_account
     from googleapiclient.discovery import build
@@ -29,6 +29,34 @@ class DataLoader:
         self.pdfs_folder_id = "18a3tuxtwP84nZ6-hFu7BVz3jiePKGuNI"
         self.data_folder_id = "1X_sp-ME4haIcCkpcmG1v_Hhot3yAlvK-"
         self.labels_folder_id = "NOT_FOUND"
+
+    def _get_drive_service(self):
+        """Get Google Drive service using credentials from secrets or file"""
+        if not GOOGLE_AVAILABLE:
+            return None
+            
+        try:
+            # Try Streamlit secrets first (for production)
+            if hasattr(st, 'secrets') and 'google_drive' in st.secrets:
+                credentials_dict = dict(st.secrets['google_drive'])
+                credentials = service_account.Credentials.from_service_account_info(
+                    credentials_dict,
+                    scopes=['https://www.googleapis.com/auth/drive.readonly']
+                )
+            # Fallback to local file (for development)
+            elif os.path.exists('credentials.json'):
+                credentials = service_account.Credentials.from_service_account_file(
+                    'credentials.json',
+                    scopes=['https://www.googleapis.com/auth/drive.readonly']
+                )
+            else:
+                return None
+                
+            return build('drive', 'v3', credentials=credentials)
+            
+        except Exception as e:
+            st.error(f"Error creating Drive service: {e}")
+            return None
 
     def get_label_path(self, username: str, maskedid: str, eye: str, vf_number: int) -> str:
         """Gera caminho do arquivo com username para evitar conflitos"""
@@ -58,16 +86,11 @@ class DataLoader:
 
     def get_pdf_from_drive(self, pdf_filename: str) -> Optional[BytesIO]:
         """Baixa PDF do Google Drive e retorna como BytesIO"""
-        if not GOOGLE_AVAILABLE:
+        service = self._get_drive_service()
+        if not service:
             return None
         
         try:
-            credentials = service_account.Credentials.from_service_account_file(
-                'credentials.json',
-                scopes=['https://www.googleapis.com/auth/drive.readonly']  # Apenas leitura
-            )
-            service = build('drive', 'v3', credentials=credentials)
-            
             # Busca o arquivo PDF na pasta PDFs
             results = service.files().list(
                 q=f"name='{pdf_filename}' and parents in '{self.pdfs_folder_id}'"
@@ -97,16 +120,11 @@ class DataLoader:
 
     def get_csv_from_drive(self, csv_filename: str = "opv_24-2_prepared.csv") -> Optional[pd.DataFrame]:
         """Baixa CSV do Google Drive e retorna como DataFrame"""
-        if not GOOGLE_AVAILABLE:
+        service = self._get_drive_service()
+        if not service:
             return None
         
         try:
-            credentials = service_account.Credentials.from_service_account_file(
-                'credentials.json',
-                scopes=['https://www.googleapis.com/auth/drive.readonly']
-            )
-            service = build('drive', 'v3', credentials=credentials)
-            
             # Busca o arquivo CSV na pasta data
             results = service.files().list(
                 q=f"name='{csv_filename}' and parents in '{self.data_folder_id}'"
@@ -140,16 +158,11 @@ class DataLoader:
     @st.cache_data
     def get_pdf_as_public_url(_self, pdf_filename: str) -> Optional[str]:
         """Tenta obter URL público do PDF (se compartilhado publicamente)"""
-        if not GOOGLE_AVAILABLE:
+        service = _self._get_drive_service()
+        if not service:
             return None
         
         try:
-            credentials = service_account.Credentials.from_service_account_file(
-                'credentials.json',
-                scopes=['https://www.googleapis.com/auth/drive.readonly']
-            )
-            service = build('drive', 'v3', credentials=credentials)
-            
             # Busca o arquivo
             results = service.files().list(
                 q=f"name='{pdf_filename}' and parents in '{_self.pdfs_folder_id}'"
