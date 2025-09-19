@@ -1,5 +1,3 @@
-# Criar um requirements.txt limpo
-@"
 streamlit
 streamlit-authenticator
 pandas
@@ -11,4 +9,3 @@ google-api-python-client
 google-auth
 google-auth-oauthlib
 google-auth-httplib2
-"@ | Out-File -FilePath requirements.txt -Encoding UTF8
