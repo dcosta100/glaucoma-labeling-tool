@@ -22,6 +22,19 @@ def labeling_page():
     
     # Get current authenticated username
     username = st.session_state.get('specialist_name', 'unknown')
+
+    st.write(f"GOOGLE_AVAILABLE: {dl.GOOGLE_AVAILABLE if hasattr(dl, 'GOOGLE_AVAILABLE') else 'Not found'}")
+    st.write(f"Has secrets: {hasattr(st, 'secrets')}")
+    if hasattr(st, 'secrets'):
+        st.write(f"Secrets keys: {list(st.secrets.keys())}")
+        if 'google_drive' in st.secrets:
+            st.write("google_drive section found")
+        else:
+            st.write("google_drive section NOT found")
+
+    service = dl._get_drive_service()
+    st.write(f"Drive service created: {service is not None}")
+    st.write("==================")
     
     # Initialize data loader for cloud/local operations
     dl = DataLoader()

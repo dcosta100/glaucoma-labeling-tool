@@ -4,8 +4,8 @@ Admin Statistics Module - Página para visualizar progresso de todos os usuário
 
 import streamlit as st
 import pandas as pd
+import os
 from .patient_tracker import PatientTracker
-from .config import CSV_PATH
 
 def show_admin_stats():
     """Mostra estatísticas detalhadas para administradores"""
@@ -13,14 +13,38 @@ def show_admin_stats():
     st.markdown("# 📊 Admin Dashboard - Progress Statistics")
     st.markdown("---")
     
-    # Load data
-    try:
-        df = pd.read_csv(CSV_PATH)
-        all_patients = df["maskedid"].unique().tolist()
-        total_patients = len(all_patients)
-    except Exception as e:
-        st.error(f"Error loading database: {e}")
-        return
+    # Load data using DataLoader (same as labeling.py)
+    from .dataloader import DataLoader
+    dl = DataLoader()
+    
+    # Try to load CSV from Google Drive first
+    df = None
+    data_source = None
+    
+    with st.spinner("Loading database from cloud..."):
+        df = dl.get_csv_from_drive("opv_24-2_prepared.csv")
+        if df is not None:
+            data_source = "cloud"
+            st.success("Database loaded from Google Drive")
+    
+    # Fallback to local if cloud fails
+    if df is None:
+        try:
+            from .config import CSV_PATH
+            if os.path.exists(CSV_PATH):
+                df = pd.read_csv(CSV_PATH)
+                data_source = "local"
+                st.info("Using local database")
+            else:
+                st.error("Database not found in cloud or locally")
+                st.error("Please ensure CSV file is uploaded to Google Drive")
+                return
+        except Exception as e:
+            st.error(f"Error loading database: {e}")
+            return
+    
+    all_patients = df["maskedid"].unique().tolist()
+    total_patients = len(all_patients)
     
     tracker = PatientTracker()
     
@@ -42,6 +66,9 @@ def show_admin_stats():
             st.metric("Avg Completion", "0.0%")
     
     st.markdown("---")
+    
+    # Show data source
+    st.caption(f"Data source: {data_source}")
     
     # User progress table
     if all_users_stats:
@@ -123,6 +150,26 @@ def show_admin_stats():
     col1, col2 = st.columns(2)
     
     with col1:
+        st.markdown("### 🔄 Reset User Progress")
+        if all_users_stats:
+            user_to_reset = st.selectbox(
+                "Select user to reset:",
+                options=[''] + [stat['username'] for stat in all_users_stats],
+                key="reset_user_select"
+            )
+            
+            if user_to_reset:
+                if st.button(f"Reset {user_to_reset}'s Progress", type="secondary"):
+                    if st.checkbox("I confirm this action", key="confirm_reset"):
+                        if tracker.reset_user_progress(user_to_reset):
+                            st.success(f"✅ Reset progress for {user_to_reset}")
+                            st.rerun()
+                        else:
+                            st.error("Failed to reset progress")
+        else:
+            st.info("No users with progress to reset")
+    
+    with col2:
         st.markdown("### 📥 Export Progress Report")
         if st.button("Download Progress Report", type="secondary"):
             report = tracker.export_progress_report()
