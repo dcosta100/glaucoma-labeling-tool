@@ -22,3 +22,12 @@ credentials:
       password: password
       roles:
       - viewer
+    gustavo_samico:
+      email: samico@example.com
+      failed_login_attempts: 0
+      first_name: Gustavo
+      last_name: Samico
+      logged_in: false
+      password: samicomiami123
+      roles:
+      - viewer
