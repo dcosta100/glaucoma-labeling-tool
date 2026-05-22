@@ -142,7 +142,7 @@ def _collect_labels(eid: str) -> dict:
 def _render_eye_column(maskedid: str, eye: str, exams: List[dict]) -> None:
     st.subheader(config.EYE_LABELS[eye])
     if not exams:
-        st.info(f"Sem campos visuais para o olho {eye}.")
+        st.info(f"No visual fields for the {eye} eye.")
         return
 
     source_eid = _eid(maskedid, eye, int(exams[0]["visual_field_number"]))
@@ -173,20 +173,20 @@ def _render_eye_column(maskedid: str, eye: str, exams: List[dict]) -> None:
         if img.exists():
             st.image(str(img), width="stretch")
         else:
-            st.warning(f"Imagem não encontrada: {ex['image_filename']}")
+            st.warning(f"Image not found: {ex['image_filename']}")
 
         # status da cascata
         if not is_source:
             if detached.get(eid, False):
                 cols = st.columns([3, 1])
-                cols[0].caption("✏️ Editado de forma independente")
-                if cols[1].button("↻ Copiar do #1", key=f"reattach|{eid}"):
+                cols[0].caption("✏️ Edited independently")
+                if cols[1].button("↻ Copy from #1", key=f"reattach|{eid}"):
                     detached[eid] = False
                     for f in config.LABEL_FIELDS:
                         st.session_state.pop(_wkey(eid, f), None)
                     st.rerun()
             else:
-                st.caption("↳ Copiado automaticamente do Field #1 (edite para destacar)")
+                st.caption("↳ Auto-copied from Field #1 (edit to override)")
 
         _render_exam_labels(eid, is_source)
         st.divider()
@@ -223,15 +223,15 @@ def labeling_page(df) -> None:
         done = len(completed)
         pct = (done / total * 100) if total else 0
         c1, c2 = st.columns(2)
-        c1.metric("Rotulados", f"{done} / {total}")
-        c2.metric("Restantes", total - done)
+        c1.metric("Labeled", f"{done} / {total}")
+        c2.metric("Remaining", total - done)
         st.progress(done / total if total else 0)
-        st.caption(f"{pct:.0f}% concluído")
+        st.caption(f"{pct:.0f}% complete")
         st.divider()
 
-        st.markdown("### Navegação")
+        st.markdown("### Navigation")
         jump = st.selectbox(
-            "Ir para paciente",
+            "Go to patient",
             options=list(range(total)),
             index=idx,
             format_func=lambda i: f"{'✅ ' if patients[i] in completed else ''}{i + 1}. {patients[i]}",
@@ -241,18 +241,36 @@ def labeling_page(df) -> None:
             st.rerun()
 
         nav1, nav2 = st.columns(2)
-        if nav1.button("← Anterior", width="stretch", disabled=idx == 0):
+        if nav1.button("← Previous", width="stretch", disabled=idx == 0):
             st.session_state["patient_idx"] = idx - 1
             st.rerun()
-        if nav2.button("Próximo →", width="stretch", disabled=idx >= total - 1):
+        if nav2.button("Next →", width="stretch", disabled=idx >= total - 1):
             st.session_state["patient_idx"] = idx + 1
             st.rerun()
 
+        # ----- guia de referência ----- #
+        if config.REFERENCE_GUIDE.exists():
+            st.divider()
+            st.markdown("### Reference")
+            with open(config.REFERENCE_GUIDE, "rb") as f:
+                st.download_button(
+                    "📖 Visual Field Patterns guide",
+                    data=f.read(),
+                    file_name=config.REFERENCE_GUIDE.name,
+                    mime="application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+                    width="stretch",
+                )
+            st.caption("Download the grading reference document.")
+
+        # ----- crédito ----- #
+        st.divider()
+        st.caption("Created by Douglas Costa MD PhD")
+
     # ----- cabeçalho ----- #
     age = data.patient_age(df_patient)
-    status = "✅ Concluído" if maskedid in completed else ""
+    status = "✅ Completed" if maskedid in completed else ""
     st.markdown(f"## Patient {maskedid} — Age {age}  {status}")
-    st.caption(f"Paciente {idx + 1} de {total}")
+    st.caption(f"Patient {idx + 1} of {total}")
 
     _init_patient(maskedid, df_patient)
 
@@ -266,13 +284,13 @@ def labeling_page(df) -> None:
     # ----- ações ----- #
     st.divider()
     b1, b2, b3 = st.columns([1, 1, 2])
-    save = b1.button("💾 Salvar", width="stretch")
-    save_next = b3.button("✅ Salvar e próximo paciente", type="primary", width="stretch")
+    save = b1.button("💾 Save", width="stretch")
+    save_next = b3.button("✅ Save and next patient", type="primary", width="stretch")
 
     if save or save_next:
         n = _save_patient(name, maskedid, df_patient)
         storage.mark_completed(name, maskedid)
-        st.success(f"{n} campo(s) salvo(s) para o paciente {maskedid}.")
+        st.success(f"Saved {n} field(s) for patient {maskedid}.")
         if save_next:
             nxt = idx + 1
             if nxt < total:
@@ -280,7 +298,7 @@ def labeling_page(df) -> None:
                 st.rerun()
             else:
                 st.balloons()
-                st.success("Todos os pacientes foram percorridos!")
+                st.success("All patients have been reviewed!")
 
 
 def _save_patient(name: str, maskedid: str, df_patient) -> int:

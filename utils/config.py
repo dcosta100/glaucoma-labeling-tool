@@ -42,6 +42,11 @@ MANIFEST_PATH = _resolve("manifest_path", ROOT_DIR / "data" / "prepared" / "mani
 IMAGES_DIR = _resolve("images_dir", ROOT_DIR / "data" / "prepared" / "images")
 OUTPUT_DIR = _resolve("output_dir", ROOT_DIR / "labels")
 
+# Guia de referência (grading) disponibilizado ao labeler para download
+REFERENCE_GUIDE = _resolve(
+    "reference_guide", ROOT_DIR / "reference" / "Visual_Field_Patterns_Revised.docx"
+)
+
 # -----------------------------
 # UI
 # -----------------------------

@@ -1,73 +1,79 @@
 # Visual Field Labeling Tool (local)
 
-Ferramenta em Streamlit para rotular campos visuais (HFA 24-2 / 30-2) de pacientes
-com glaucoma. Roda **localmente** em cada máquina: os labelers recebem as imagens
-prontas e os rótulos são salvos no próprio computador, para depois serem
-consolidados.
+Streamlit tool for grading visual fields (HFA 24-2 / 30-2) of glaucoma patients.
+It runs **locally** on each machine: labelers receive the prepared images and the
+labels are saved on their own computer, to be consolidated later.
+
+Created by Douglas Costa MD PhD.
 
 ---
 
-## Fluxo geral
+## Overall workflow
 
-1. **Você (preparação)** roda `scripts/prepare_data.py` para gerar:
-   - `data/prepared/manifest.csv` — um exame por linha (paciente, olho, nº do campo,
-     idade, data, MD/PSD/VFI/GHT, nome da imagem);
-   - `data/prepared/images/*.png` — os printouts convertidos de PDF para PNG.
-2. **Distribuição** — envie para cada labeler: o código, o `manifest.csv` e a pasta
-   `images/`. (O `.dta` e os PDFs originais ficam só com você.)
-3. **Cada labeler** preenche `labeler_config.yaml` com o nome e roda o app.
-4. **Coleta** — cada labeler te envia a pasta `labels/<nome>/`, em especial o
-   `labels_<nome>.csv` consolidado.
+1. **You (preparation)** run `scripts/prepare_data.py` to generate:
+   - `data/prepared/manifest.csv` — one exam per row (patient, eye, field number,
+     age, date, MD/PSD/VFI/GHT, image filename);
+   - `data/prepared/images/*.png` — the printouts converted from PDF to PNG.
+2. **Distribution** — send each labeler: the code, `manifest.csv`, the `images/`
+   folder and the `reference/` guide. (The `.dta` and original PDFs stay with you.)
+3. **Each labeler** fills in `labeler_config.yaml` with their name and runs the app.
+4. **Collection** — each labeler sends you back their `labels/<name>/` folder,
+   especially the consolidated `labels_<name>.csv`.
 
 ---
 
-## Preparação dos dados (você)
+## Data preparation (you)
 
 ```bash
 pip install -r requirements.txt
-python scripts/prepare_data.py            # gera manifest + PNGs
-python scripts/prepare_data.py --force    # reconverte PNGs existentes
-python scripts/prepare_data.py --no-images  # só atualiza o manifest
+python scripts/prepare_data.py            # generate manifest + PNGs
+python scripts/prepare_data.py --force    # re-convert existing PNGs
+python scripts/prepare_data.py --no-images  # update the manifest only
 ```
 
-O script lê `data/opv_export_masked_20220901.dta`, mantém apenas os exames cujo PDF
-está em `data/hfa_gradings/`, calcula a idade e o número do campo visual (ordem
-cronológica por olho) e converte cada PDF em PNG. É seguro re-rodar conforme novos
-PDFs forem chegando — PNGs já gerados são pulados.
+The script reads `data/opv_export_masked_20220901.dta`, keeps only the exams whose
+PDF is present in `data/hfa_gradings/`, computes the patient age and the visual
+field number (chronological order per eye) and converts each PDF to PNG. It is safe
+to re-run as new PDFs arrive — PNGs that already exist are skipped.
 
 ---
 
-## Uso pelo labeler
+## Labeler usage
 
-1. Abra `labeler_config.yaml` e preencha `labeler_name` com o seu nome.
-2. Rode:
+1. Open `labeler_config.yaml` and set `labeler_name` to your name.
+2. Run:
    ```bash
    pip install streamlit pandas pyyaml pillow
    streamlit run app.py
    ```
-3. Para cada paciente, todos os campos visuais aparecem lado a lado:
-   **olho direito (R) na coluna da esquerda**, **olho esquerdo (L) na coluna da
-   direita**, em ordem cronológica.
+3. For each patient, all visual fields are shown side by side:
+   **right eye (R) in the left column**, **left eye (L) in the right column**,
+   in chronological order.
 
-### Replicação automática (cascata)
+### Automatic replication (cascade)
 
-- O **1º campo (mais antigo)** de cada olho é a fonte.
-- Os campos seguintes do mesmo olho **copiam automaticamente** os rótulos da fonte.
-- Ao **editar qualquer rótulo de um campo seguinte**, só aquele campo muda — ele
-  passa a ser independente e deixa de seguir a fonte.
-- Um botão **"↻ Copiar do #1"** permite re-acoplar um campo à fonte.
+- The **first field (oldest)** of each eye is the source.
+- The following fields of the same eye **automatically copy** the source labels.
+- Editing **any label of a following field** changes only that field — it becomes
+  independent and stops following the source.
+- A **"↻ Copy from #1"** button lets you re-attach a field to the source.
 
-Botões **Salvar** e **Salvar e próximo paciente** gravam todos os campos do paciente.
+The **Save** and **Save and next patient** buttons store every field of the patient.
+
+### Reference guide
+
+The sidebar has a **download button** for the Visual Field Patterns grading guide,
+available whenever in doubt about a classification.
 
 ---
 
-## Onde os rótulos são salvos
+## Where labels are saved
 
 ```
-labels/<nome>/
-  progress.json                       # pacientes concluídos
-  json/<maskedid>__<olho>__<nº>.json  # backup por exame
-  labels_<nome>.csv                   # consolidado (1 linha por campo visual)
+labels/<name>/
+  progress.json                       # completed patients + resume point
+  json/<maskedid>__<eye>__<n>.json    # per-exam backup
+  labels_<name>.csv                   # consolidated (one row per visual field)
 ```
 
-O `labels_<nome>.csv` é o arquivo a consolidar entre todos os labelers.
+The `labels_<name>.csv` is the file to consolidate across all labelers.
