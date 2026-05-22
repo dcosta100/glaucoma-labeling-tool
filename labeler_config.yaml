@@ -1,11 +1,13 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Configuração do labeler (uma por máquina)
+# Labeler configuration (one per machine)
 # ─────────────────────────────────────────────────────────────────────────────
-# Preencha o nome de quem vai rotular nesta máquina. Esse nome é gravado junto
-# com os rótulos para que possamos consolidar o trabalho de todos depois.
+# Name of the person grading on this machine. It is stored together with the
+# labels so we can consolidate everyone's work later. You can also set it the
+# first time you open the app (it will ask and save it here automatically).
 labeler_name: "doug"
 
-# Caminhos (normalmente não precisam mudar). Relativos à pasta do projeto.
+# Paths (usually no need to change). Relative to the project folder.
 manifest_path: data/prepared/manifest.csv
 images_dir: data/prepared/images
 output_dir: labels
+reference_guide: reference/Visual_Field_Patterns_Revised.docx

@@ -38,15 +38,30 @@ to re-run as new PDFs arrive — PNGs that already exist are skipped.
 
 ---
 
-## Labeler usage
+## Packaging for labelers (no Python install)
 
-1. Open `labeler_config.yaml` and set `labeler_name` to your name.
-2. Run:
+To hand the tool to someone who does not have Python, build a self-contained
+package on your machine:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File build_package.ps1
+```
+
+This produces `dist/glaucoma-labeling-tool.zip` containing the app, the prepared
+data and a bundled `uv.exe`. The labeler unzips it and **double-clicks
+`Start Labeling.bat`** — the first run downloads Python and dependencies
+automatically (needs internet once), then the app opens in the browser. The app
+asks for their name on first launch and remembers it.
+
+## Labeler usage (manual / development)
+
+1. Run the app:
    ```bash
    pip install streamlit pandas pyyaml pillow
    streamlit run app.py
    ```
-3. For each patient, all visual fields are shown side by side:
+   On the first launch it asks for your name and saves it to `labeler_config.yaml`.
+2. For each patient, all visual fields are shown side by side:
    **right eye (R) in the left column**, **left eye (L) in the right column**,
    in chronological order.
 

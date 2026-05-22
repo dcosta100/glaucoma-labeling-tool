@@ -29,6 +29,27 @@ _cfg = _load_machine_config()
 
 LABELER_NAME: str = str(_cfg.get("labeler_name", "")).strip()
 
+
+def get_labeler_name() -> str:
+    """Lê o nome atual do labeler do arquivo (fresco a cada chamada)."""
+    return str(_load_machine_config().get("labeler_name", "")).strip()
+
+
+def set_labeler_name(name: str) -> None:
+    """Grava o nome no labeler_config.yaml preservando comentários e atualiza o global."""
+    import re
+
+    global LABELER_NAME
+    name = name.strip()
+    new_line = f'labeler_name: "{name}"'
+    text = _CONFIG_PATH.read_text(encoding="utf-8") if _CONFIG_PATH.exists() else ""
+    if re.search(r"(?m)^labeler_name:.*$", text):
+        text = re.sub(r"(?m)^labeler_name:.*$", new_line, text)
+    else:
+        text = (new_line + "\n") + text
+    _CONFIG_PATH.write_text(text, encoding="utf-8")
+    LABELER_NAME = name
+
 # Caminhos (relativos à raiz, a menos que absolutos no yaml)
 def _resolve(key: str, default: Path) -> Path:
     val = _cfg.get(key)

@@ -225,3 +225,6 @@ trash/
 credentials.json
 *.json
 .streamlit/secrets.toml
+
+# Bundled uv binary (downloaded during packaging, not versioned)
+uv.exe

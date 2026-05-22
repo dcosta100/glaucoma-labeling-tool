@@ -15,12 +15,19 @@ def _stop_with(msg: str) -> None:
 
 
 # ----- validações de configuração ----- #
-if not config.LABELER_NAME:
+if not config.get_labeler_name():
     st.title("👀 Visual Field Labeling Tool")
-    _stop_with(
-        "Labeler name is not configured. Open **labeler_config.yaml** and set "
-        "`labeler_name` to your name, then restart the app."
-    )
+    st.markdown("#### Welcome! Please enter your name to begin.")
+    with st.form("labeler_name_form"):
+        name_input = st.text_input("Your name", placeholder="e.g. Jane Smith")
+        submitted = st.form_submit_button("Start labeling", type="primary")
+    if submitted and name_input.strip():
+        config.set_labeler_name(name_input.strip())
+        st.rerun()
+    st.caption("Your name is saved on this machine and stored with your labels.")
+    st.stop()
+
+config.LABELER_NAME = config.get_labeler_name()
 
 if not config.MANIFEST_PATH.exists():
     _stop_with(

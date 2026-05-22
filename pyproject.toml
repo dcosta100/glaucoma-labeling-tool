@@ -1,0 +1,16 @@
+[project]
+name = "glaucoma-labeling-tool"
+version = "1.0.0"
+description = "Local Streamlit tool for grading glaucoma visual fields"
+requires-python = ">=3.11,<3.14"
+dependencies = [
+    "streamlit",
+    "pandas",
+    "pyyaml",
+    "pillow",
+]
+
+# PyMuPDF is only needed for the preparation step (scripts/prepare_data.py),
+# not for the labeler app. Install it with:  uv pip install pymupdf
+[project.optional-dependencies]
+prepare = ["pymupdf"]
