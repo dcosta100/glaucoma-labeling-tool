@@ -1,0 +1,11 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# Configuração do labeler (uma por máquina)
+# ─────────────────────────────────────────────────────────────────────────────
+# Preencha o nome de quem vai rotular nesta máquina. Esse nome é gravado junto
+# com os rótulos para que possamos consolidar o trabalho de todos depois.
+labeler_name: "doug"
+
+# Caminhos (normalmente não precisam mudar). Relativos à pasta do projeto.
+manifest_path: data/prepared/manifest.csv
+images_dir: data/prepared/images
+output_dir: labels

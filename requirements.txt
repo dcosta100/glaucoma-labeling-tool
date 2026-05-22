@@ -1,11 +1,6 @@
 streamlit
-streamlit-authenticator
 pandas
 PyYAML
 Pillow
+# Apenas para o passo de preparação (scripts/prepare_data.py):
 PyMuPDF
-icecream
-google-api-python-client
-google-auth
-google-auth-oauthlib
-google-auth-httplib2

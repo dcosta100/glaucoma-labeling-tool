@@ -1,140 +1,123 @@
-# utils/config.py
-from pathlib import Path
-import os
+"""
+Configuração do app de labeling (versão local/offline).
 
-# -----------------------------
-# Raiz do projeto (pasta acima de utils/)
-# -----------------------------
+Caminhos de dados e a taxonomia de rótulos de campo visual. Os caminhos podem ser
+sobrescritos pelo labeler_config.yaml na raiz do projeto.
+"""
+from __future__ import annotations
+
+from pathlib import Path
+
+import yaml
+
 ROOT_DIR = Path(__file__).resolve().parents[1]
 
 # -----------------------------
-# Caminhos principais (como Path)
+# Configuração por máquina (labeler_config.yaml)
 # -----------------------------
-DATA_DIR = ROOT_DIR / "data"
-LABELS_DIR = ROOT_DIR / "labels"
-PDF_DIR = DATA_DIR / "pdfs"
-
-# Imagens/ativos opcionais (ajuste se sua estrutura diferir)
-HERO_PATH = ROOT_DIR / "source" / "AdobeStock_743049872-2500x1092.jpeg"
-BADGE_PATH = ROOT_DIR / "source" / "BPEI_animated.gif"
-
-# Arquivo CSV padrão
-CSV_PATH = DATA_DIR / "opv_24-2_prepared.csv"
-PDF_DIR = "C:\\Users\\dxr1276\\Box\\PROJECTS\\VF_GRADINGS\\hfa_printouts"
-
-CSV_PATH_LOCAL = DATA_DIR / "opv_24-2_prepared.csv"
+_CONFIG_PATH = ROOT_DIR / "labeler_config.yaml"
 
 
-USE_GOOGLE_DRIVE = True  # Mude para False se quiser forçar local
+def _load_machine_config() -> dict:
+    if _CONFIG_PATH.exists():
+        with open(_CONFIG_PATH, encoding="utf-8") as f:
+            return yaml.safe_load(f) or {}
+    return {}
 
-LABELS_DIR.mkdir(parents=True, exist_ok=True)
 
-# Função para determinar fonte de dados
-def get_data_source():
-    """Retorna se deve usar Google Drive ou arquivos locais"""
-    # Se tiver arquivo credentials.json, usa Google Drive
-    if os.path.exists("credentials.json") and USE_GOOGLE_DRIVE:
-        return "drive"
-    # Senão usa local
-    elif os.path.exists(CSV_PATH_LOCAL):
-        return "local"
-    else:
-        return "drive"  # Força Drive se não tem dados locais
+_cfg = _load_machine_config()
+
+LABELER_NAME: str = str(_cfg.get("labeler_name", "")).strip()
+
+# Caminhos (relativos à raiz, a menos que absolutos no yaml)
+def _resolve(key: str, default: Path) -> Path:
+    val = _cfg.get(key)
+    if not val:
+        return default
+    p = Path(val)
+    return p if p.is_absolute() else (ROOT_DIR / p)
+
+
+MANIFEST_PATH = _resolve("manifest_path", ROOT_DIR / "data" / "prepared" / "manifest.csv")
+IMAGES_DIR = _resolve("images_dir", ROOT_DIR / "data" / "prepared" / "images")
+OUTPUT_DIR = _resolve("output_dir", ROOT_DIR / "labels")
 
 # -----------------------------
-# Overrides por variável de ambiente (opcional)
-# -----------------------------
-CSV_PATH = Path(os.getenv("CSV_PATH", CSV_PATH))
-PDF_DIR = Path(os.getenv("PDF_DIR", PDF_DIR))
-LABELS_DIR = Path(os.getenv("LABELS_DIR", LABELS_DIR))
-
-# Garante que a pasta de labels exista
-LABELS_DIR.mkdir(parents=True, exist_ok=True)
-
-# Versões em string (para libs que exigem str)
-CSV_PATH_STR = str(CSV_PATH)
-PDF_DIR_STR = str(PDF_DIR)
-LABELS_DIR_STR = str(LABELS_DIR)
-
-# -----------------------------
-# Constantes de UI/rotulagem
-# -----------------------------
-VISUAL_FIELD_LABELS = {
-    'normality': ['Normal', 'Abnormal'],
-    'reliability': ['Reliable', 'Unreliable'],
-    'gdefect1': ['Null', 'Central Loss', 'Paracentral Loss', 'Nasal Step', 'Temporal Wedge',
-                 'Particual Arcuate Defect', 'Complete Arcuate Defect', 'Atitudinal Defect',
-                 'Generalized Constrcition', 'Generalized Reduced Sensitivity', 'Total Loss of Field', 'Unclassifiable'],
-    'gdefect2': ['Null', 'Central Loss', 'Paracentral Loss', 'Nasal Step', 'Temporal Wedge',
-                 'Particual Arcuate Defect', 'Complete Arcuate Defect', 'Atitudinal Defect',
-                 'Generalized Constrcition', 'Generalized Reduced Sensitivity', 'Total Loss of Field', 'Unclassifiable'],
-    'gdefect3': ['Null', 'Central Loss', 'Paracentral Loss', 'Nasal Step', 'Temporal Wedge',
-                 'Particual Arcuate Defect', 'Complete Arcuate Defect', 'Atitudinal Defect',
-                 'Generalized Constrcition', 'Generalized Reduced Sensitivity', 'Total Loss of Field', 'Unclassifiable'],
-    'gposition1': ['Null', 'Superior', 'Inferior'],
-    'gposition2': ['Null', 'Superior', 'Inferior'],
-    'gposition3': ['Null', 'Superior', 'Inferior'],
-    'ngdefect1': ['Null', 'Hemianopia', 'Quadranopia', 'Non-glaucomatous Central Loss', 'Enlarged Blind Spot'],
-    'ngdefect2': ['Null', 'Hemianopia', 'Quadranopia', 'Non-glaucomatous Central Loss', 'Enlarged Blind Spot'],
-    'ngdefect3': ['Null', 'Hemianopia', 'Quadranopia', 'Non-glaucomatous Central Loss', 'Enlarged Blind Spot'],
-    'ngposition1': ['Null', 'Nasal', 'Temporal', 'Superior Nasal', 'Inferior Nasal', 'Superior Temporal', 'Inferior Temporal'],
-    'ngposition2': ['Null', 'Nasal', 'Temporal', 'Superior Nasal', 'Inferior Nasal', 'Superior Temporal', 'Inferior Temporal'],
-    'ngposition3': ['Null', 'Nasal', 'Temporal', 'Superior Nasal', 'Inferior Nasal', 'Superior Temporal', 'Inferior Temporal'],
-    'artifact1': ['Null', 'Upper Eyelid Artifact', 'Lens Rim Artifact/ Peripheral Rim', 'Cloverleaf Defect', 'Blind Spot Absence', 'Trigger Happy'],
-    'artifact2': ['Null', 'Upper Eyelid Artifact', 'Lens Rim Artifact/ Peripheral Rim', 'Cloverleaf Defect', 'Blind Spot Absence', 'Trigger Happy'],
-    'comment': ''
-}
-
-EYES = ["R", "L"]
-
-# Extensões aceitas
-EXTS = (".png", ".jpg", ".jpeg", ".PNG", ".JPG", ".JPEG", ".tiff", ".TIFF",
-        ".bmp", ".BMP", ".gif", ".GIF", ".pdf", ".PDF", ".eps", ".EPS",
-        ".svg", ".SVG", ".webp", ".WEBP", ".heic", ".HEIC", ".raw", ".RAW",
-        ".cr2", ".CR2", ".nef", ".NEF", ".orf", ".ORF", ".sr2", ".SR2")
-
-# Valores padrão/compatibilidade
-DEFAULTS = {
-    'vf_od': None, 'oct_od': None, 'vf_os': None, 'oct_os': None,
-    'd1_vf_od': None, 'd2_vf_od': None, 'd1_vf_os': None, 'd2_vf_os': None,
-    'd1_oct_od': None, 'd2_oct_od': None, 'd1_oct_os': None, 'd2_oct_os': None
-}
-
-# Cache
-MAX_CACHE_SIZE = 5
-CACHE_EXPIRY_HOURS = 24
-
 # UI
-PAGE_TITLE = "Glaucoma Progression Interface - Labeling"
-LAYOUT = "wide"
-SIDEBAR_STATE = "expanded"
-SCROLLABLE_BOX_HEIGHT = 450
-IMAGE_QUALITY = 'high'
-
-# Datas / formatos
-DATE_FORMAT = "%Y-%m-%d"
-TIMESTAMP_FORMAT = "%Y-%m-%d, %H:%M:%S"
-FILENAME_TIMESTAMP_FORMAT = "%Y%m%d_%H%M%S"
-
-# Validações
-MAX_IMAGE_SIZE_MB = 50
-SUPPORTED_MODALITIES = ['VF', 'OCT']
-SUPPORTED_EYES = ['OD', 'OS']
-
-# Organização
+# -----------------------------
+PAGE_TITLE = "Visual Field Labeling Tool"
 ORGANIZATION_NAME = "Glaucoma and Data Science Laboratory"
 INSTITUTION_NAME = "Bascom Palmer Eye Institute"
 
-# Exposição explícita dos símbolos principais (útil para linters/auto-complete)
-__all__ = [
-    "ROOT_DIR", "DATA_DIR", "LABELS_DIR", "PDF_DIR", "CSV_PATH",
-    "HERO_PATH", "BADGE_PATH",
-    "CSV_PATH_STR", "PDF_DIR_STR", "LABELS_DIR_STR",
-    "VISUAL_FIELD_LABELS", "EYES", "EXTS", "DEFAULTS",
-    "MAX_CACHE_SIZE", "CACHE_EXPIRY_HOURS",
-    "PAGE_TITLE", "LAYOUT", "SIDEBAR_STATE", "SCROLLABLE_BOX_HEIGHT", "IMAGE_QUALITY",
-    "DATE_FORMAT", "TIMESTAMP_FORMAT", "FILENAME_TIMESTAMP_FORMAT",
-    "MAX_IMAGE_SIZE_MB", "SUPPORTED_MODALITIES", "SUPPORTED_EYES",
-    "PROGRESSION_STATUS_OPTIONS", "EVALUATION_KEYS",
-    "ORGANIZATION_NAME", "INSTITUTION_NAME"
+# Olhos: R (direito) -> coluna esquerda; L (esquerdo) -> coluna direita
+EYES = ["R", "L"]
+EYE_LABELS = {"R": "Right Eye (OD)", "L": "Left Eye (OS)"}
+
+# -----------------------------
+# Taxonomia de rótulos
+# -----------------------------
+# Coluna 1: sempre visível, sem opção "Null"
+NORMALITY = ["Normal", "Abnormal"]
+RELIABILITY = ["Reliable", "Unreliable"]
+
+# Coluna 2: defeitos glaucomatosos (revelação progressiva, começam em "Null")
+G_DEFECT = [
+    "Null", "Central Loss", "Paracentral Loss", "Nasal Step", "Temporal Wedge",
+    "Partial Arcuate Defect", "Complete Arcuate Defect", "Altitudinal Defect",
+    "Generalized Constriction", "Generalized Reduced Sensitivity",
+    "Total Loss of Field", "Unclassifiable",
 ]
+G_POSITION = ["Null", "Superior", "Inferior"]
+
+# Coluna 3: defeitos não-glaucomatosos
+NG_DEFECT = [
+    "Null", "Hemianopia", "Quadranopia", "Non-glaucomatous Central Loss",
+    "Enlarged Blind Spot",
+]
+NG_POSITION = [
+    "Null", "Nasal", "Temporal", "Superior Nasal", "Inferior Nasal",
+    "Superior Temporal", "Inferior Temporal",
+]
+
+# Coluna 4: artefatos
+ARTIFACT = [
+    "Null", "Upper Eyelid Artifact", "Lens Rim Artifact / Peripheral Rim",
+    "Cloverleaf Defect", "Blind Spot Absence", "Trigger Happy",
+]
+
+# Opções por chave de rótulo
+OPTIONS = {
+    "normality": NORMALITY,
+    "reliability": RELIABILITY,
+    "gdefect1": G_DEFECT, "gposition1": G_POSITION,
+    "gdefect2": G_DEFECT, "gposition2": G_POSITION,
+    "gdefect3": G_DEFECT, "gposition3": G_POSITION,
+    "ngdefect1": NG_DEFECT, "ngposition1": NG_POSITION,
+    "ngdefect2": NG_DEFECT, "ngposition2": NG_POSITION,
+    "ngdefect3": NG_DEFECT, "ngposition3": NG_POSITION,
+    "artifact1": ARTIFACT,
+    "artifact2": ARTIFACT,
+}
+
+# Ordem canônica de todos os campos de rótulo (para salvar/copiar/CSV)
+LABEL_FIELDS = [
+    "normality", "reliability",
+    "gdefect1", "gposition1", "gdefect2", "gposition2", "gdefect3", "gposition3",
+    "ngdefect1", "ngposition1", "ngdefect2", "ngposition2", "ngdefect3", "ngposition3",
+    "artifact1", "artifact2",
+    "comment",
+]
+
+# Cadeias de defeito/posição com revelação progressiva (coluna -> lista de pares)
+G_CHAIN = [("gdefect1", "gposition1"), ("gdefect2", "gposition2"), ("gdefect3", "gposition3")]
+NG_CHAIN = [("ngdefect1", "ngposition1"), ("ngdefect2", "ngposition2"), ("ngdefect3", "ngposition3")]
+
+
+def default_value(field: str) -> str:
+    """Valor inicial de um campo: 'Null' quando existe, senão a 1ª opção."""
+    if field == "comment":
+        return ""
+    opts = OPTIONS.get(field, [])
+    if "Null" in opts:
+        return "Null"
+    return opts[0] if opts else ""

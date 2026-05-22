@@ -1,76 +1,36 @@
 # ─────────────────────────────────────────────────────────────────────────────
-# Glaucoma Progression Interface — Simple Login : Last update September 18, 2025
+# Visual Field Labeling Tool — versão local/offline
 # ─────────────────────────────────────────────────────────────────────────────
 import streamlit as st
-import streamlit_authenticator as stauth
-import yaml
-from yaml.loader import SafeLoader
-from utils import labeling
-from utils.admin_stats import show_admin_stats, add_admin_menu
 
-st.set_page_config(page_title="Visual Field Labeling Tool", layout="wide")
+from utils import config, data
+from utils.labeling_ui import labeling_page
 
-# Load configuration
-with open('config.yaml') as file:
-    config = yaml.load(file, Loader=SafeLoader)
+st.set_page_config(page_title=config.PAGE_TITLE, layout="wide")
 
-# Create authenticator
-authenticator = stauth.Authenticate(
-    config['credentials'],
-    config['cookie']['name'],
-    config['cookie']['key'],
-    config['cookie']['expiry_days']
-)
 
-# Login widget
-authenticator.login()
+def _stop_with(msg: str) -> None:
+    st.error(msg)
+    st.stop()
 
-# Check authentication
-if st.session_state['authentication_status']:
-    # User authenticated - show main app
-    st.session_state['specialist_name'] = st.session_state['username']
-    
-    # Logout button in sidebar
-    with st.sidebar:
-        st.write(f"Welcome **{st.session_state['name']}**")
-        authenticator.logout('Logout', 'sidebar')
-    
-    # Add admin menu if user is admin
-    add_admin_menu()
-    
-    # Check if should show admin stats
-    if st.session_state.get('show_admin_stats', False):
-        show_admin_stats()
-        
-        # Button to return to labeling
-        if st.button("← Back to Labeling"):
-            st.session_state['show_admin_stats'] = False
-            st.rerun()
-    else:
-        # Load labeling page
-        labeling.labeling_page()
 
-elif st.session_state['authentication_status'] == False:
-    # Wrong credentials
-    st.error('Username/password is incorrect')
+# ----- validações de configuração ----- #
+if not config.LABELER_NAME:
+    st.title("👀 Visual Field Labeling Tool")
+    _stop_with(
+        "Nome do labeler não configurado. Abra **labeler_config.yaml** e preencha "
+        "`labeler_name` com o seu nome, depois reinicie o app."
+    )
 
-else:
-    # Not logged in - show login page
-    st.markdown("""
-        <h1 style='text-align:center; color:#1f77b4; margin-bottom:30px;'>
-            👀 Visual Field Labeling Tool
-        </h1>
-        <div style='text-align:center; margin-bottom:30px;'>
-            <p>Please login to access the visual field labeling system</p>
-        </div>
-    """, unsafe_allow_html=True)
-    
-    # Footer
-    st.markdown("""
-        <div style='position: fixed; bottom: 0; width: 100%; text-align: center; 
-                    background: linear-gradient(90deg, #1f77b4, #1565c0); padding: 15px 0; z-index: 9999;'>
-            <p style='color: white; margin: 0; font-weight: 500;'>
-            Glaucoma and Data Science Laboratory | Bascom Palmer Eye Institute
-            </p>
-        </div>
-    """, unsafe_allow_html=True)
+if not config.MANIFEST_PATH.exists():
+    _stop_with(
+        f"Manifest não encontrado em `{config.MANIFEST_PATH}`. "
+        "Rode `python scripts/prepare_data.py` ou confirme os caminhos no labeler_config.yaml."
+    )
+
+df = data.get_manifest()
+if df.empty:
+    _stop_with("O manifest está vazio — nenhum exame para rotular.")
+
+# ----- app ----- #
+labeling_page(df)
